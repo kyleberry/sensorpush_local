@@ -1,10 +1,16 @@
 {
   "domain": "sensorpush_local",
   "name": "SensorPush Local",
-  "config_flow": true,
-  "iot_class": "local_polling",
-  "requirements": [
-    "bleak-retry-connector>=1.17.0"
+  "codeowners": [
+    "@kyleberry"
   ],
-  "version": "1.2.0"
+  "config_flow": true,
+  "documentation": "https://github.com/kyleberry/sensorpush_local",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/kyleberry/sensorpush_local/issues",
+  "requirements": [
+    "bleak-retry-connector>=3.4.0",
+    "aiousbwatcher>=1.0.0"
+  ],
+  "version": "0.2.0"
 }

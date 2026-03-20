@@ -20,20 +20,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SensorPush Local from a config entry."""
     coordinator = SensorPushCoordinator(hass)
 
-    # Store the coordinator for the sensors to use
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
-    # Set up the sensor platform
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
 
-    # Register the manual audit service
     async def handle_manual_audit(call):
         _LOGGER.info("Manual SensorPush Local Audit triggered")
-        # This tells the coordinator to refresh all entities it manages
         await coordinator.async_refresh()
 
     hass.services.async_register(DOMAIN, "run_audit", handle_manual_audit)
-
     return True
 
 
@@ -50,20 +45,14 @@ class SensorPushCoordinator(DataUpdateCoordinator):
 
     def __init__(self, hass: HomeAssistant):
         super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
+            hass, _LOGGER, name=DOMAIN,
             update_interval=timedelta(hours=24),
         )
         self.lock = asyncio.Lock()
 
-    def is_audit_locked(self) -> bool:
-        """Check if the shared lock is currently held."""
-        return self.lock.locked()
-
     async def audit_device(self, mac: str, name: str):
         """Perform a single GATT audit using the shared lock."""
-        if self.is_audit_locked():
+        if self.lock.locked():
             _LOGGER.debug(f"Audit for {mac} deferred: Lock is held...")
             return {}
 
@@ -76,19 +65,10 @@ class SensorPushCoordinator(DataUpdateCoordinator):
                 return {}
 
             try:
-                # establish_connection handles the HA Bluetooth proxy hunting
-                async with await establish_connection(
-                    BleakClient,
-                    ble_device,
-                    name,
-                    timeout=45.0
-                ) as client:
-
-                    # 1. Hardware ID & Battery Reads (with 10s individual timeouts)
+                async with await establish_connection(BleakClient, ble_device, name, timeout=45.0) as client:
                     res_model = await asyncio.wait_for(client.read_gatt_char(CHAR_MODEL), 10.0)
                     res_batt = await asyncio.wait_for(client.read_gatt_char(CHAR_BATTERY), 10.0)
 
-                    # 2. Validation
                     if len(res_batt) != 4:
                         _LOGGER.error(
                             f"Malformed battery payload from {name}: {len(res_batt)} bytes")
@@ -96,8 +76,6 @@ class SensorPushCoordinator(DataUpdateCoordinator):
 
                     v_raw, t_at_read = struct.unpack('<HH', res_batt)
                     is_legacy = (len(res_model) == 4)
-
-                    # 3. Austin Ranch Math
                     voltage = (float(v_raw) + 2140.0) / \
                         1000.0 if is_legacy else float(v_raw) / 1000.0
 
@@ -107,7 +85,8 @@ class SensorPushCoordinator(DataUpdateCoordinator):
                         "raw_v": v_raw,
                         "temp_at_read": t_at_read,
                         "source": ble_device.details.get("source", "unknown"),
-                        "timestamp": dt_util.utcnow().isoformat()
+                        "timestamp": dt_util.utcnow().isoformat(),
+                        "is_legacy": is_legacy
                     }
 
             except asyncio.TimeoutError:
@@ -119,8 +98,5 @@ class SensorPushCoordinator(DataUpdateCoordinator):
             return {}
 
     async def _async_update_data(self):
-        """This is called by the coordinator's timer or async_refresh()."""
-        # Note: We don't actually store a single 'data' dict here because
-        # the sensors call audit_device() individually when they are told
-        # to update. This keeps the logic simple and prevents bulk failures.
+        """Mandatory for Coordinator but we use audit_device manually."""
         return {}

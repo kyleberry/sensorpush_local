@@ -1,0 +1,14 @@
+{
+  "name": "Home Assistant Integration Dev",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true,
+      "upgradePackages": true
+    }
+  },
+  "remoteUser": "root",
+  "postCreateCommand": "pip install -e .[test] --config-settings editable_mode=compat"
+}

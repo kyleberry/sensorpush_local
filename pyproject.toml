@@ -1,0 +1,30 @@
+[project]
+name = "sensorpush_local"
+version = "0.2.0"
+description = "Local Bluetooth monitoring for SensorPush devices"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "homeassistant",
+    "bleak-retry-connector>=3.4.0",
+    "aiousbwatcher>=1.0.0",
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest-homeassistant-custom-component",
+    "pytest-asyncio",
+    "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [".git"]
+asyncio_mode = "auto"
+log_cli = "true"
+log_cli_level = "DEBUG"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore:inotify is a Linux and FreeBSD API:UserWarning",
+]
