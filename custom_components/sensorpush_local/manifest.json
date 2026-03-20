@@ -1,0 +1,10 @@
+{
+  "domain": "sensorpush_local",
+  "name": "SensorPush Local",
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "requirements": [
+    "bleak-retry-connector>=1.17.0"
+  ],
+  "version": "1.2.0"
+}
