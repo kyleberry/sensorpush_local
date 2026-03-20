@@ -4,5 +4,10 @@
   "render_readme": true,
   "type": "integration",
   "homeassistant": "2026.3.0",
+  "requirements": [
+    "bleak-retry-connector>=3.4.0",
+    "aiousbwatcher>=1.0.0"
+  ],
+  "build_status": "https://github.com/kyleberry/sensorpush_local/actions",
   "country": "US"
 }
