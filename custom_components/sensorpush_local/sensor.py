@@ -72,9 +72,8 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
         }
 
     @property
-    def available(self):
-        """Return True if the last audit for this specific MAC succeeded."""
-        device_data = self.coordinator.data.get(self._mac, {})
-        # If we have a voltage, we are available.
-        # If not (e.g. audit failed), HA will show 'Unavailable'
-        return "voltage" in device_data
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if not self.coordinator.data:
+            return False
+        return self._mac in self.coordinator.data
