@@ -1,0 +1,29 @@
+{
+  "title": "SensorPush Local",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add SensorPush Device",
+        "description": "Enter the details for your SensorPush sensor. Ensure it is within Bluetooth range of a proxy.",
+        "data": {
+          "address": "Bluetooth Address (e.g., AA:BB:CC:DD:EE:FF)",
+          "name": "Sensor Name"
+        }
+      }
+    },
+    "error": {
+      "already_configured": "This device is already configured.",
+      "cannot_connect": "Failed to connect to the sensor. Check range and battery.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "services": {
+    "run_audit": {
+      "name": "Run Manual Audit",
+      "description": "Triggers an immediate Bluetooth GATT audit for all configured sensors."
+    }
+  }
+}
