@@ -56,6 +56,7 @@ class SensorPushCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(hours=24),
         )
         self.lock = asyncio.Lock()
+        self.data = {}
 
     def is_audit_locked(self) -> bool:
         """Check if the shared lock is currently held."""
