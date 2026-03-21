@@ -1,0 +1,8 @@
+run_audit:
+  name: Run Manual Audit
+  description: >-
+    Triggers an immediate Bluetooth GATT audit of all configured SensorPush
+    devices, bypassing the standard 24-hour interval.
+  target:
+    entity:
+      integration: sensorpush_local
