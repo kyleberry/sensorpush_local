@@ -1,7 +1,7 @@
 # SensorPush Local (Native)
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-0.3.1-blue.svg)
 
 A high-precision, **100% local** Home Assistant integration for SensorPush sensors. This integration bypasses the Cloud API and uses Bluetooth Proxies to perform active battery audits, providing millivolt-accurate data even for sensors inside appliances like fridges or freezers.
 
