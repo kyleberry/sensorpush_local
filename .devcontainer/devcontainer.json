@@ -7,8 +7,12 @@
     "ghcr.io/devcontainers/features/common-utils:2": {
       "configureZshAsDefaultShell": true,
       "upgradePackages": true
-    }
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached"
+  ],
   "remoteUser": "root",
   "postCreateCommand": "chsh -s $(which zsh) && pip install -e .[test] --config-settings editable_mode=compat && activate-global-python-argcomplete",
   "customizations": {
