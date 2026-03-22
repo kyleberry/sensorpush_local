@@ -70,10 +70,22 @@ async def test_sensor_state_reporting(hass, mock_coordinator):
     # 7. Verify unique_id
     assert sensor.unique_id == f"sp_{mac_addr.replace(':', '').lower()}_volt_native"
 
-    # 8. Coverage for the 'Unavailable' logic branch
+    # 8. Coverage for the 'Unavailable' logic branch (audit ran, device absent)
     mock_coordinator.data = {}
     assert sensor.available is False
+    assert sensor.native_value is None
     assert sensor.extra_state_attributes == {}
+
+    # 9. Coverage for the 'audit pending' branch (coordinator never ran)
+    mock_coordinator.data = None
+    assert sensor.available is True
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes == {}
+
+    # 10. Coverage for coordinator failure branch (last_update_success = False)
+    mock_coordinator.last_update_success = False
+    assert sensor.available is False
+    mock_coordinator.last_update_success = True
 
 
 @pytest.mark.asyncio

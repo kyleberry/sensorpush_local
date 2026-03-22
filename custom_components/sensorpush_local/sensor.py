@@ -49,7 +49,7 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the voltage from the last successful coordinator audit."""
-        if not self.coordinator.data:
+        if self.coordinator.data is None:
             return None
         device_data = self.coordinator.data.get(self._mac, {})
         return device_data.get("voltage")
@@ -57,7 +57,7 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         """Return the hardened audit attributes."""
-        if not self.coordinator.data:
+        if self.coordinator.data is None:
             return {}
         device_data = self.coordinator.data.get(self._mac, {})
 
@@ -78,6 +78,6 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
         """Return True if the coordinator is healthy and this device has data."""
         if not super().available:
             return False
-        if not self.coordinator.data:
+        if self.coordinator.data is None:
             return True  # Audit pending after startup; not truly unavailable
         return self._mac in self.coordinator.data
