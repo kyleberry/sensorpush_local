@@ -8,6 +8,7 @@ dependencies = [
     "homeassistant",
     "bleak-retry-connector>=3.4.0",
     "aiousbwatcher",
+    "pyserial",
 ]
 
 [project.optional-dependencies]
