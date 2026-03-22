@@ -15,6 +15,9 @@ from .const import DOMAIN, CHAR_BATTERY, CHAR_MODEL, MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 
+_MAX_AUDIT_RETRIES = 2    # retries after first failure (3 total attempts)
+_RETRY_DELAY_SECS = 10    # seconds between retry attempts
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SensorPush Local from a config entry."""
@@ -103,56 +106,81 @@ class SensorPushCoordinator(DataUpdateCoordinator):
         return new_data
 
     async def audit_device(self, mac: str, name: str):
-        """Perform a single GATT audit using the shared lock."""
-        # 1. Immediate exit if another sensor is currently auditing
-        if self.is_audit_locked():
-            _LOGGER.debug("Audit for %s (%s) deferred: Lock is held...", name, mac)
-            return {}
+        """Perform a GATT audit, retrying on timeout up to _MAX_AUDIT_RETRIES times.
 
-        async with self.lock:
-            ble_device = bluetooth.async_ble_device_from_address(self.hass, mac, connectable=True)
-            if not ble_device:
-                _LOGGER.debug("Device %s (%s) not found by any proxies.", mac, name)
+        The lock is released between retry attempts so that other devices in the
+        audit queue are not blocked during the backoff sleep.  Each attempt calls
+        async_ble_device_from_address fresh, so a retry may be routed to a
+        different (now-free) proxy than the one that timed out.
+        """
+        max_attempts = _MAX_AUDIT_RETRIES + 1
+
+        for attempt in range(1, max_attempts + 1):
+            if self.is_audit_locked():
+                _LOGGER.debug("Audit for %s (%s) deferred: Lock is held...", name, mac)
                 return {}
 
-            # Capture pre-connection advertisement data for RSSI and source.
-            # BLEDevice.rssi was removed in newer bleak/habluetooth; service_info
-            # is the correct way to obtain it in HA.
-            service_info = bluetooth.async_last_service_info(self.hass, mac, connectable=True)
+            timed_out = False
+            async with self.lock:
+                ble_device = bluetooth.async_ble_device_from_address(self.hass, mac, connectable=True)
+                if not ble_device:
+                    _LOGGER.debug("Device %s (%s) not found by any proxies.", mac, name)
+                    return {}
 
-            try:
-                async with await establish_connection(BleakClient, ble_device, name, timeout=45.0) as client:
-                    # Read GATT chars
-                    res_model = await asyncio.wait_for(client.read_gatt_char(CHAR_MODEL), 10.0)
-                    res_batt = await asyncio.wait_for(client.read_gatt_char(CHAR_BATTERY), 10.0)
+                # Capture pre-connection advertisement data for RSSI and source.
+                # BLEDevice.rssi was removed in newer bleak/habluetooth; service_info
+                # is the correct way to obtain it in HA.
+                service_info = bluetooth.async_last_service_info(self.hass, mac, connectable=True)
 
-                    if len(res_batt) != 4:
-                        _LOGGER.error("Malformed battery payload from %s: %d bytes", name, len(res_batt))
-                        return {}
+                try:
+                    async with await establish_connection(BleakClient, ble_device, name, timeout=45.0) as client:
+                        # Read GATT chars
+                        res_model = await asyncio.wait_for(client.read_gatt_char(CHAR_MODEL), 10.0)
+                        res_batt = await asyncio.wait_for(client.read_gatt_char(CHAR_BATTERY), 10.0)
 
-                    # v_raw: millivolts; t_at_read: raw uint16 from device (units device-dependent)
-                    v_raw, t_at_read = struct.unpack('<HH', res_batt)
-                    is_legacy = (len(res_model) == 4)
+                        if len(res_batt) != 4:
+                            _LOGGER.error("Malformed battery payload from %s: %d bytes", name, len(res_batt))
+                            return {}
 
-                    voltage = (float(v_raw) + 2140.0) / 1000.0 if is_legacy else float(v_raw) / 1000.0
+                        # v_raw: millivolts; t_at_read: raw uint16 from device (units device-dependent)
+                        v_raw, t_at_read = struct.unpack('<HH', res_batt)
+                        is_legacy = (len(res_model) == 4)
 
-                    source = service_info.source if service_info else (ble_device.details or {}).get("source", "unknown")
-                    scanner = bluetooth.async_scanner_by_source(self.hass, source)
-                    source_name = scanner.name if (scanner and scanner.name) else source
+                        voltage = (float(v_raw) + 2140.0) / 1000.0 if is_legacy else float(v_raw) / 1000.0
 
-                    return {
-                        "voltage": round(voltage, 3),
-                        "rssi": service_info.rssi if service_info else None,
-                        "raw_v": v_raw,
-                        "temp_at_read": t_at_read,
-                        "is_legacy": is_legacy,
-                        "source": source_name,
-                        "timestamp": dt_util.utcnow().isoformat()
-                    }
+                        source = service_info.source if service_info else (ble_device.details or {}).get("source", "unknown")
+                        scanner = bluetooth.async_scanner_by_source(self.hass, source)
+                        source_name = scanner.name if (scanner and scanner.name) else source
 
-            except asyncio.TimeoutError:
-                _LOGGER.warning("Connection timeout for %s (%s).", name, mac)
-            except Exception as err:
-                _LOGGER.error("Audit error for %s: %s - %s", name, type(err).__name__, err)
+                        return {
+                            "voltage": round(voltage, 3),
+                            "rssi": service_info.rssi if service_info else None,
+                            "raw_v": v_raw,
+                            "temp_at_read": t_at_read,
+                            "is_legacy": is_legacy,
+                            "source": source_name,
+                            "timestamp": dt_util.utcnow().isoformat()
+                        }
 
-            return {}
+                except asyncio.TimeoutError:
+                    timed_out = True
+                    if attempt < max_attempts:
+                        _LOGGER.warning(
+                            "Timeout for %s (%s) — attempt %d/%d, retrying in %ds",
+                            name, mac, attempt, max_attempts, _RETRY_DELAY_SECS,
+                        )
+                    else:
+                        _LOGGER.warning(
+                            "Connection timeout for %s (%s) — all %d attempts exhausted.",
+                            name, mac, max_attempts,
+                        )
+                except Exception as err:
+                    _LOGGER.error("Audit error for %s: %s - %s", name, type(err).__name__, err)
+                    return {}
+
+            # Lock released. Wait before retry so the proxy has time to free up
+            # and HA may select a different proxy on the next attempt.
+            if timed_out and attempt < max_attempts:
+                await asyncio.sleep(_RETRY_DELAY_SECS)
+
+        return {}
