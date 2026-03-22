@@ -20,8 +20,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SensorPush Local from a config entry."""
     coordinator = SensorPushCoordinator(hass, entry)
 
-    await coordinator.async_config_entry_first_refresh()
-
     # Store the coordinator for the sensors to use
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
@@ -31,10 +29,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register the manual audit service
     async def handle_manual_audit(call):
         _LOGGER.info("Manual SensorPush Local Audit triggered")
-        # This tells the coordinator to refresh all entities it manages
         await coordinator.async_refresh()
 
     hass.services.async_register(DOMAIN, "run_audit", handle_manual_audit)
+
+    # Run the initial audit in the background so HA startup is not blocked.
+    # GATT connections can take 10-45s per device; blocking setup causes the
+    # stage 2 bootstrap timeout to fire on systems with multiple sensors.
+    entry.async_create_background_task(
+        hass,
+        coordinator.async_refresh(),
+        "sensorpush_local_initial_audit",
+    )
 
     return True
 
@@ -109,6 +115,11 @@ class SensorPushCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("Device %s (%s) not found by any proxies.", mac, name)
                 return {}
 
+            # Capture pre-connection advertisement data for RSSI and source.
+            # BLEDevice.rssi was removed in newer bleak/habluetooth; service_info
+            # is the correct way to obtain it in HA.
+            service_info = bluetooth.async_last_service_info(self.hass, mac, connectable=True)
+
             try:
                 async with await establish_connection(BleakClient, ble_device, name, timeout=45.0) as client:
                     # Read GATT chars
@@ -125,13 +136,13 @@ class SensorPushCoordinator(DataUpdateCoordinator):
 
                     voltage = (float(v_raw) + 2140.0) / 1000.0 if is_legacy else float(v_raw) / 1000.0
 
-                    source = (ble_device.details or {}).get("source", "unknown")
+                    source = service_info.source if service_info else (ble_device.details or {}).get("source", "unknown")
                     scanner = bluetooth.async_scanner_by_source(self.hass, source)
                     source_name = scanner.name if (scanner and scanner.name) else source
 
                     return {
                         "voltage": round(voltage, 3),
-                        "rssi": ble_device.rssi,
+                        "rssi": service_info.rssi if service_info else None,
                         "raw_v": v_raw,
                         "temp_at_read": t_at_read,
                         "is_legacy": is_legacy,

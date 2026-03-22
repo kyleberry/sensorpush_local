@@ -21,9 +21,11 @@ async def test_run_audit_service(hass, mock_coordinator):
     mock_coordinator.config_entry = mock_entry
 
     with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
-         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"):
+         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
+         patch.object(mock_entry, "async_create_background_task"):
 
         await async_setup_entry(hass, mock_entry)
+        mock_coordinator.async_refresh.reset_mock()
 
         # Verify service call triggers refresh
         await hass.services.async_call(DOMAIN, "run_audit", blocking=True)
@@ -65,7 +67,8 @@ async def test_unload_entry(hass, mock_coordinator):
 
     with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
          patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
-         patch("homeassistant.config_entries.ConfigEntries.async_unload_platforms", return_value=True):
+         patch("homeassistant.config_entries.ConfigEntries.async_unload_platforms", return_value=True), \
+         patch.object(mock_entry, "async_create_background_task"):
 
         await async_setup_entry(hass, mock_entry)
         assert DOMAIN in hass.data
@@ -74,6 +77,26 @@ async def test_unload_entry(hass, mock_coordinator):
         await async_unload_entry(hass, mock_entry)
         assert mock_entry.entry_id not in hass.data.get(DOMAIN, {})
         assert not hass.services.has_service(DOMAIN, "run_audit")
+
+
+@pytest.mark.asyncio
+async def test_initial_audit_scheduled_as_background_task(hass, mock_coordinator):
+    """Test that setup schedules the initial audit as a background task, not blocking startup."""
+    mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={})
+    mock_entry.add_to_hass(hass)
+    mock_entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
+    mock_coordinator.config_entry = mock_entry
+
+    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
+         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
+         patch.object(mock_entry, "async_create_background_task") as mock_bg_task:
+
+        await async_setup_entry(hass, mock_entry)
+
+        # Verify a background task was scheduled with the expected name
+        mock_bg_task.assert_called_once()
+        _, _, task_name = mock_bg_task.call_args.args
+        assert task_name == "sensorpush_local_initial_audit"
 
 
 @pytest.mark.asyncio
