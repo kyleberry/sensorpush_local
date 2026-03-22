@@ -7,7 +7,7 @@ A high-precision, **100% local** Home Assistant integration for SensorPush senso
 
 ## ✨ Features
 
-* **Active Battery Audits:** Performs a daily GATT connection to retrieve real-time millivolt data.
+* **Active Battery Audits:** Performs a daily GATT connection to retrieve real-time millivolt data. The initial audit runs in the background so HA startup is never blocked.
 * **Smart Calibration:** Automatically detects hardware generations (HT1 vs HT.w/HTP.xw) to apply correct voltage offsets.
 * **Infrastructure Hardened:** Uses a global concurrency lock to prevent Bluetooth proxy contention.
 * **Resilient:** If a device is temporarily unreachable, its last-known value is preserved until the next successful audit rather than disappearing from the UI.
