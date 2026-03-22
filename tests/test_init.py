@@ -144,7 +144,47 @@ async def test_update_data_stores_successful_audit_result(hass, mock_coordinator
     with patch.object(mock_coordinator, "audit_device", return_value=audit_result):
         result = await mock_coordinator._async_update_data()
 
-    assert result == {"AA:BB:CC:DD:EE:FF": audit_result}
+    expected = {"AA:BB:CC:DD:EE:FF": audit_result}
+    assert result == expected
+    mock_coordinator._store.async_save.assert_called_once_with(expected)
+
+
+@pytest.mark.asyncio
+async def test_persisted_data_loaded_on_startup(hass, mock_coordinator):
+    """Test that async_load_persisted_data seeds coordinator.data from storage."""
+    stored = {"AA:BB:CC:DD:EE:FF": {"voltage": 3.0, "rssi": -55, "source": "hci0"}}
+    mock_coordinator._store.async_load.return_value = stored
+
+    await mock_coordinator.async_load_persisted_data()
+
+    assert mock_coordinator.data == stored
+
+
+@pytest.mark.asyncio
+async def test_persisted_data_none_leaves_data_empty(hass, mock_coordinator):
+    """Test that async_load_persisted_data with no stored data leaves coordinator.data unchanged."""
+    mock_coordinator._store.async_load.return_value = None
+
+    await mock_coordinator.async_load_persisted_data()
+
+    assert mock_coordinator.data == {}
+
+
+@pytest.mark.asyncio
+async def test_setup_loads_persisted_data(hass, mock_coordinator):
+    """Test that async_setup_entry calls async_load_persisted_data before the background audit."""
+    mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={})
+    mock_entry.add_to_hass(hass)
+    mock_entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
+    mock_coordinator.config_entry = mock_entry
+
+    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
+         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
+         patch.object(mock_entry, "async_create_background_task"):
+
+        await async_setup_entry(hass, mock_entry)
+
+    mock_coordinator._store.async_load.assert_called_once()
 
 
 @pytest.mark.asyncio

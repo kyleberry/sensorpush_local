@@ -31,4 +31,8 @@ async def mock_coordinator(hass):
         # We mock async_refresh so we don't actually trigger BLE audits in tests
         coordinator.async_refresh = AsyncMock()
 
+        # Mock storage so tests don't touch the filesystem
+        coordinator._store.async_load = AsyncMock(return_value=None)
+        coordinator._store.async_save = AsyncMock()
+
         return coordinator
