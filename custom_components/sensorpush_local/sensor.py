@@ -4,8 +4,9 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorStateClass,
 )
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities = []
 
     # Match existing SensorPush devices to our new native entities
-    for device in [d for d in dev_reg.devices.values() if d.manufacturer == "SensorPush"]:
+    for device in [d for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER]:
         mac = next((i[1].upper()
                    for i in device.identifiers if i[0] == "bluetooth"), None)
         if mac:
@@ -34,18 +35,15 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.VOLTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "V"
-    _attr_has_entity_name = True  # Cleanly names it 'Battery' under the Device
+    _attr_has_entity_name = True
+    _attr_name = "Battery"
 
     def __init__(self, coordinator, device, mac):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._mac = mac
         self._attr_unique_id = f"sp_{mac.replace(':', '').lower()}_volt_native"
-        self._attr_device_info = {
-            "identifiers": device.identifiers,
-        }
-        # Sets the entity name to "Battery (Native)"
-        self._attr_name = "Battery (Native)"
+        self._attr_device_info = DeviceInfo(identifiers=device.identifiers)
 
     @property
     def native_value(self):
@@ -58,7 +56,6 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
         """Return the hardened audit attributes."""
         device_data = self.coordinator.data.get(self._mac, {})
 
-        # If the audit failed or hasn't run, we return existing attributes
         if not device_data:
             return {}
 
@@ -73,7 +70,5 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
-        if not self.coordinator.data:
-            return False
-        return self._mac in self.coordinator.data
+        """Return True if the coordinator is healthy and this device has data."""
+        return super().available and self._mac in self.coordinator.data

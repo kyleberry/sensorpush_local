@@ -10,6 +10,7 @@ A high-precision, **100% local** Home Assistant integration for SensorPush senso
 * **Active Battery Audits:** Performs a daily GATT connection to retrieve real-time millivolt data.
 * **Smart Calibration:** Automatically detects hardware generations (HT1 vs HT.w/HTP.xw) to apply correct voltage offsets.
 * **Infrastructure Hardened:** Uses a global concurrency lock to prevent Bluetooth proxy contention.
+* **Resilient:** If a device is temporarily unreachable, its last-known value is preserved until the next successful audit rather than disappearing from the UI.
 * **Native Integration:** Sensors attach directly to your existing SensorPush devices in the Home Assistant UI.
 * **Diagnostic Data:** Includes RSSI-at-read, Proxy Source, and Raw Value as entity attributes.
 
@@ -33,7 +34,7 @@ A high-precision, **100% local** Home Assistant integration for SensorPush senso
 
 1. Go to **Settings > Devices & Services**.
 2. Click **Add Integration** and search for **SensorPush Local**.
-3. Follow the UI prompts to complete the setup.
+3. Click **Submit** — no further input is required.
 
 ## 🛠️ Services
 
@@ -46,9 +47,10 @@ This integration provides a service to trigger an audit of all sensors manually 
 Every battery entity includes the following attributes for troubleshooting:
 
 * `rssi_at_read`: Signal strength at the moment of the audit.
-* `proxy_source`: The MAC of the Bluetooth Proxy/Adapter used.
+* `proxy_source`: Friendly name of the Bluetooth adapter or proxy used for the connection, resolved via HA's scanner registry (e.g. "Living Room Hub"). Falls back to the raw source identifier (e.g. `hci0`) if the scanner cannot be found.
 * `last_audit`: ISO timestamp of the last successful connection.
 * `raw_value`: The raw millivolt count from the sensor firmware.
+* `temp_at_read`: Raw temperature value returned alongside the battery read. Units are device-dependent and not calibrated °C.
 * `model_type`: Identified hardware generation.
 
 ---

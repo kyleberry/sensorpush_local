@@ -13,16 +13,12 @@ async def test_audit_timeout_handling(hass, mock_coordinator, caplog):
     mock_ble = MagicMock()
     mock_ble.address = "AA:BB:CC:DD:EE:FF"
 
-    async def stalled_read(*args, **kwargs):
-        await asyncio.sleep(20)
-        return b"\x00"
-
     # Patch the lookup AND the connection
     with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
          patch("custom_components.sensorpush_local.establish_connection") as mock_conn:
 
         mock_client = AsyncMock()
-        mock_client.read_gatt_char.side_effect = stalled_read
+        mock_client.read_gatt_char.side_effect = asyncio.TimeoutError
         mock_conn.return_value.__aenter__.return_value = mock_client
 
         result = await coordinator.audit_device("AA:BB:CC:DD:EE:FF", "Test Sensor")
@@ -75,8 +71,12 @@ async def test_model_detection_logic(hass, mock_coordinator):
         return mock_ble
 
     # 2. Patch BOTH the bluetooth lookup and the connection establishment
+    mock_scanner = MagicMock()
+    mock_scanner.name = "Living Room Hub"
+
     with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address") as mock_bt_lookup, \
-         patch("custom_components.sensorpush_local.establish_connection") as mock_conn:
+         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
+         patch("custom_components.sensorpush_local.bluetooth.async_scanner_by_source", return_value=mock_scanner):
 
         mock_client = AsyncMock()
         mock_conn.return_value.__aenter__.return_value = mock_client
@@ -92,6 +92,7 @@ async def test_model_detection_logic(hass, mock_coordinator):
         # Verify Ranch Math: (860 + 2140) / 1000 = 3.0
         assert res_ht1["voltage"] == 3.0
         assert res_ht1["is_legacy"] is True
+        assert res_ht1["source"] == "Living Room Hub"
 
         # --- CASE 2: HT.w (Modern/2-byte) ---
         mac_htw = "BB:22"
@@ -105,3 +106,24 @@ async def test_model_detection_logic(hass, mock_coordinator):
         # Verify Modern Math: 860 / 1000 = 0.86
         assert res_htw["voltage"] == 0.86
         assert res_htw["is_legacy"] is False
+
+
+@pytest.mark.asyncio
+async def test_source_falls_back_to_raw_when_scanner_not_found(hass, mock_coordinator):
+    """Test that source falls back to raw identifier when scanner lookup returns None."""
+    mock_ble = MagicMock()
+    mock_ble.address = "AA:11"
+    mock_ble.rssi = -70
+    mock_ble.details = {"source": "hci0"}
+
+    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
+         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
+         patch("custom_components.sensorpush_local.bluetooth.async_scanner_by_source", return_value=None):
+
+        mock_client = AsyncMock()
+        mock_client.read_gatt_char.side_effect = [MOCK_MODEL_HTW, MOCK_BATT_860MV]
+        mock_conn.return_value.__aenter__.return_value = mock_client
+
+        result = await mock_coordinator.audit_device("AA:11", "Test Sensor")
+
+    assert result["source"] == "hci0"

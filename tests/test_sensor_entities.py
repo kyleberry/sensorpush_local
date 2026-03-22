@@ -1,7 +1,8 @@
 import pytest
+from unittest.mock import patch, AsyncMock, MagicMock
 from homeassistant.helpers import device_registry as dr
-from custom_components.sensorpush_local.const import DOMAIN
-from custom_components.sensorpush_local.sensor import SensorPushVoltageSensor
+from custom_components.sensorpush_local.const import DOMAIN, MANUFACTURER
+from custom_components.sensorpush_local.sensor import SensorPushVoltageSensor, async_setup_entry
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 @pytest.mark.asyncio
@@ -72,3 +73,37 @@ async def test_sensor_state_reporting(hass, mock_coordinator):
     # 8. Coverage for the 'Unavailable' logic branch
     mock_coordinator.data = {}
     assert sensor.available is False
+    assert sensor.extra_state_attributes == {}
+
+
+@pytest.mark.asyncio
+async def test_sensor_async_setup_entry_creates_entities(hass, mock_coordinator):
+    """Test that async_setup_entry creates one entity per registered SensorPush device."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
+    entry.add_to_hass(hass)
+
+    # Link coordinator into hass.data as the real setup would
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
+
+    # Register two SensorPush devices in the device registry
+    dev_reg = dr.async_get(hass)
+    dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
+        manufacturer=MANUFACTURER,
+        name="Sensor One",
+    )
+    dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("bluetooth", "11:22:33:44:55:66")},
+        manufacturer=MANUFACTURER,
+        name="Sensor Two",
+    )
+
+    added = []
+    await async_setup_entry(hass, entry, lambda entities: added.extend(entities))
+
+    assert len(added) == 2
+    macs = {e._mac for e in added}
+    assert macs == {"AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"}
+    assert all(isinstance(e, SensorPushVoltageSensor) for e in added)

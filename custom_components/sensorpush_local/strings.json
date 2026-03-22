@@ -3,21 +3,12 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add SensorPush Device",
-        "description": "Enter the details for your SensorPush sensor. Ensure it is within Bluetooth range of a proxy.",
-        "data": {
-          "address": "Bluetooth Address (e.g., AA:BB:CC:DD:EE:FF)",
-          "name": "Sensor Name"
-        }
+        "title": "Add SensorPush Local",
+        "description": "Click Submit to begin monitoring your SensorPush sensors via Bluetooth proxies."
       }
     },
-    "error": {
-      "already_configured": "This device is already configured.",
-      "cannot_connect": "Failed to connect to the sensor. Check range and battery.",
-      "unknown": "An unexpected error occurred."
-    },
     "abort": {
-      "already_configured": "Device is already configured"
+      "single_instance_allowed": "SensorPush Local is already configured."
     }
   },
   "services": {

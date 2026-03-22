@@ -1,7 +1,6 @@
 """Constants for the SensorPush Local integration."""
 
 DOMAIN = "sensorpush_local"
-VERSION = "0.2.0"
 MANUFACTURER = "SensorPush"
 
 # GATT Characteristics

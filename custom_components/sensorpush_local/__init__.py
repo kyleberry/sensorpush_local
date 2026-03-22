@@ -11,7 +11,7 @@ from homeassistant.util import dt as dt_util
 
 from bleak_retry_connector import establish_connection, BleakClientWithServiceCache as BleakClient
 
-from .const import DOMAIN, CHAR_BATTERY, CHAR_MODEL
+from .const import DOMAIN, CHAR_BATTERY, CHAR_MODEL, MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +44,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+        hass.services.async_remove(DOMAIN, "run_audit")
     return unload_ok
 
 
@@ -67,13 +68,18 @@ class SensorPushCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch data for all registered SensorPush devices in a serial loop."""
+        if self.lock.locked():
+            _LOGGER.debug("Audit already in progress — skipping concurrent refresh to preserve existing data.")
+            return self.data
+
         from homeassistant.helpers import device_registry as dr
 
         dev_reg = dr.async_get(self.hass)
-        new_data = {}
+        # Carry forward last-known data; only overwrite on successful audit
+        new_data = dict(self.data or {})
 
         # Find all devices from the 'SensorPush' manufacturer
-        sensor_devices = [d for d in dev_reg.devices.values() if d.manufacturer == "SensorPush"]
+        sensor_devices = [d for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER]
 
         for device in sensor_devices:
             mac = next((i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None)
@@ -94,13 +100,13 @@ class SensorPushCoordinator(DataUpdateCoordinator):
         """Perform a single GATT audit using the shared lock."""
         # 1. Immediate exit if another sensor is currently auditing
         if self.is_audit_locked():
-            _LOGGER.debug(f"Audit for {name} ({mac}) deferred: Lock is held...")
+            _LOGGER.debug("Audit for %s (%s) deferred: Lock is held...", name, mac)
             return {}
 
         async with self.lock:
             ble_device = bluetooth.async_ble_device_from_address(self.hass, mac, connectable=True)
             if not ble_device:
-                _LOGGER.debug(f"Device {mac} ({name}) not found by any proxies.")
+                _LOGGER.debug("Device %s (%s) not found by any proxies.", mac, name)
                 return {}
 
             try:
@@ -110,13 +116,18 @@ class SensorPushCoordinator(DataUpdateCoordinator):
                     res_batt = await asyncio.wait_for(client.read_gatt_char(CHAR_BATTERY), 10.0)
 
                     if len(res_batt) != 4:
-                        _LOGGER.error(f"Malformed battery payload from {name}: {len(res_batt)} bytes")
+                        _LOGGER.error("Malformed battery payload from %s: %d bytes", name, len(res_batt))
                         return {}
 
+                    # v_raw: millivolts; t_at_read: raw uint16 from device (units device-dependent)
                     v_raw, t_at_read = struct.unpack('<HH', res_batt)
                     is_legacy = (len(res_model) == 4)
 
                     voltage = (float(v_raw) + 2140.0) / 1000.0 if is_legacy else float(v_raw) / 1000.0
+
+                    source = (ble_device.details or {}).get("source", "unknown")
+                    scanner = bluetooth.async_scanner_by_source(self.hass, source)
+                    source_name = scanner.name if (scanner and scanner.name) else source
 
                     return {
                         "voltage": round(voltage, 3),
@@ -124,13 +135,13 @@ class SensorPushCoordinator(DataUpdateCoordinator):
                         "raw_v": v_raw,
                         "temp_at_read": t_at_read,
                         "is_legacy": is_legacy,
-                        "source": ble_device.details.get("source", "unknown"),
+                        "source": source_name,
                         "timestamp": dt_util.utcnow().isoformat()
                     }
 
             except asyncio.TimeoutError:
-                _LOGGER.warning(f"Connection timeout for {name} ({mac}).")
+                _LOGGER.warning("Connection timeout for %s (%s).", name, mac)
             except Exception as err:
-                _LOGGER.error(f"Audit error for {name}: {type(err).__name__} - {err}")
+                _LOGGER.error("Audit error for %s: %s - %s", name, type(err).__name__, err)
 
             return {}
