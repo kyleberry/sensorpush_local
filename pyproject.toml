@@ -1,14 +1,18 @@
 [project]
 name = "sensorpush_local"
-version = "0.2.0"
+version = "0.3.3"
 description = "Local Bluetooth monitoring for SensorPush devices"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "homeassistant",
     "bleak-retry-connector>=3.4.0",
-    "aiousbwatcher>=1.0.0",
-    "pyserial>=3.5",
+    # aiousbwatcher and pyserial are not used directly by this integration
+    # but are hard-imported by homeassistant.components.usb (pulled in via
+    # the bluetooth stack). HA's wheel does not declare them in install_requires
+    # so pip will not install them transitively. Do not remove these.
+    "aiousbwatcher",
+    "pyserial",
 ]
 
 [project.optional-dependencies]
@@ -16,6 +20,7 @@ test = [
     "pytest-homeassistant-custom-component",
     "pytest-asyncio",
     "pytest-cov",
+    "argcomplete",
 ]
 
 [tool.pytest.ini_options]

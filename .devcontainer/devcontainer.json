@@ -10,5 +10,12 @@
     }
   },
   "remoteUser": "root",
-  "postCreateCommand": "pip install -e .[test] --config-settings editable_mode=compat"
+  "postCreateCommand": "chsh -s $(which zsh) && pip install -e .[test] --config-settings editable_mode=compat && activate-global-python-argcomplete",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  }
 }
