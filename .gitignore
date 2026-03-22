@@ -40,3 +40,7 @@ share/python-wheels/
 env/
 venv/
 ENV/
+
+
+.coverage
+.claude/
