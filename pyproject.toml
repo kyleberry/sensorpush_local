@@ -1,14 +1,12 @@
 [project]
 name = "sensorpush_local"
-version = "0.2.0"
+version = "0.3.3"
 description = "Local Bluetooth monitoring for SensorPush devices"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "homeassistant",
     "bleak-retry-connector>=3.4.0",
-    "aiousbwatcher>=1.0.0",
-    "pyserial>=3.5",
 ]
 
 [project.optional-dependencies]
@@ -16,6 +14,7 @@ test = [
     "pytest-homeassistant-custom-component",
     "pytest-asyncio",
     "pytest-cov",
+    "argcomplete",
 ]
 
 [tool.pytest.ini_options]
