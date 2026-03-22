@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
+from bleak import BleakError
 from custom_components.sensorpush_local.const import DOMAIN
 from .const import MOCK_MODEL_HTW, MOCK_MODEL_HT1, MOCK_BATT_860MV, MOCK_BATT_MALFORMED
 
@@ -147,6 +148,66 @@ async def test_model_detection_logic(hass, mock_coordinator):
 
         assert res_htw["voltage"] == 0.86
         assert res_htw["is_legacy"] is False
+
+
+@pytest.mark.asyncio
+async def test_bleak_error_exhausted_after_retries(hass, mock_coordinator, caplog):
+    """Test that all retry attempts are made on BleakError and the final warning is logged."""
+    coordinator = mock_coordinator
+
+    mock_ble = MagicMock()
+    mock_ble.address = "AA:BB:CC:DD:EE:FF"
+
+    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
+         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=_mock_service_info()), \
+         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
+         patch("asyncio.sleep") as mock_sleep:
+
+        mock_client = AsyncMock()
+        mock_client.read_gatt_char.side_effect = BleakError("proxy died")
+        mock_conn.return_value.__aenter__.return_value = mock_client
+
+        result = await coordinator.audit_device("AA:BB:CC:DD:EE:FF", "Test Sensor")
+
+    assert result == {}
+    assert mock_conn.call_count == 3
+    assert mock_sleep.call_count == 2
+    assert "all 3 attempts exhausted" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_bleak_error_triggers_retry(hass, mock_coordinator, caplog):
+    """Test that a BleakError is retried and succeeds on the second attempt."""
+    coordinator = mock_coordinator
+
+    mock_ble = MagicMock()
+    mock_ble.address = "AA:BB:CC:DD:EE:FF"
+
+    mock_scanner = MagicMock()
+    mock_scanner.name = "Living Room Hub"
+
+    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
+         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=_mock_service_info()), \
+         patch("custom_components.sensorpush_local.bluetooth.async_scanner_by_source", return_value=mock_scanner), \
+         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
+         patch("asyncio.sleep") as mock_sleep:
+
+        mock_client = AsyncMock()
+        # First attempt: BleakError mid-read; second attempt: success
+        mock_client.read_gatt_char.side_effect = [
+            BleakError("Peripheral changed connection status"),
+            MOCK_MODEL_HTW,
+            MOCK_BATT_860MV,
+        ]
+        mock_conn.return_value.__aenter__.return_value = mock_client
+
+        result = await coordinator.audit_device("AA:BB:CC:DD:EE:FF", "Test Sensor")
+
+    assert result["voltage"] == 0.86
+    assert mock_conn.call_count == 2
+    assert mock_sleep.call_count == 1
+    assert "BLE error" in caplog.text
+    assert "retrying" in caplog.text
 
 
 @pytest.mark.asyncio

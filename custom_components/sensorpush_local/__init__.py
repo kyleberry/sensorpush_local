@@ -6,9 +6,11 @@ from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.storage import Store
 from homeassistant.components import bluetooth
 from homeassistant.util import dt as dt_util
 
+from bleak import BleakError
 from bleak_retry_connector import establish_connection, BleakClientWithServiceCache as BleakClient
 
 from .const import DOMAIN, CHAR_BATTERY, CHAR_MODEL, MANUFACTURER
@@ -17,11 +19,17 @@ _LOGGER = logging.getLogger(__name__)
 
 _MAX_AUDIT_RETRIES = 2    # retries after first failure (3 total attempts)
 _RETRY_DELAY_SECS = 10    # seconds between retry attempts
+_STORAGE_KEY = f"{DOMAIN}.data"
+_STORAGE_VERSION = 1
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SensorPush Local from a config entry."""
     coordinator = SensorPushCoordinator(hass, entry)
+
+    # Seed coordinator with last-known values so entities are not "Unavailable"
+    # immediately after a restart while the background audit is still running.
+    await coordinator.async_load_persisted_data()
 
     # Store the coordinator for the sensors to use
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -70,10 +78,18 @@ class SensorPushCoordinator(DataUpdateCoordinator):
         )
         self.lock = asyncio.Lock()
         self.data = {}
+        self._store = Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
 
     def is_audit_locked(self) -> bool:
         """Check if the shared lock is currently held."""
         return self.lock.locked()
+
+    async def async_load_persisted_data(self):
+        """Seed coordinator data from storage so entities survive a restart."""
+        stored = await self._store.async_load()
+        if stored:
+            self.data = stored
+            _LOGGER.debug("Loaded persisted data for %d device(s)", len(stored))
 
     async def _async_update_data(self):
         """Fetch data for all registered SensorPush devices in a serial loop."""
@@ -103,15 +119,16 @@ class SensorPushCoordinator(DataUpdateCoordinator):
             if result:
                 new_data[mac] = result
 
+        await self._store.async_save(new_data)
         return new_data
 
     async def audit_device(self, mac: str, name: str):
-        """Perform a GATT audit, retrying on timeout up to _MAX_AUDIT_RETRIES times.
+        """Perform a GATT audit, retrying on timeout or BLE errors up to _MAX_AUDIT_RETRIES times.
 
         The lock is released between retry attempts so that other devices in the
         audit queue are not blocked during the backoff sleep.  Each attempt calls
         async_ble_device_from_address fresh, so a retry may be routed to a
-        different (now-free) proxy than the one that timed out.
+        different (now-free) proxy than the one that failed.
         """
         max_attempts = _MAX_AUDIT_RETRIES + 1
 
@@ -163,7 +180,7 @@ class SensorPushCoordinator(DataUpdateCoordinator):
                         }
 
                 except asyncio.TimeoutError:
-                    timed_out = True
+                    should_retry = True
                     if attempt < max_attempts:
                         _LOGGER.warning(
                             "Timeout for %s (%s) — attempt %d/%d, retrying in %ds",
@@ -174,13 +191,25 @@ class SensorPushCoordinator(DataUpdateCoordinator):
                             "Connection timeout for %s (%s) — all %d attempts exhausted.",
                             name, mac, max_attempts,
                         )
+                except BleakError as err:
+                    should_retry = True
+                    if attempt < max_attempts:
+                        _LOGGER.warning(
+                            "BLE error for %s (%s): %s — attempt %d/%d, retrying in %ds",
+                            name, mac, err, attempt, max_attempts, _RETRY_DELAY_SECS,
+                        )
+                    else:
+                        _LOGGER.warning(
+                            "BLE error for %s (%s): %s — all %d attempts exhausted.",
+                            name, mac, err, max_attempts,
+                        )
                 except Exception as err:
                     _LOGGER.error("Audit error for %s: %s - %s", name, type(err).__name__, err)
                     return {}
 
             # Lock released. Wait before retry so the proxy has time to free up
             # and HA may select a different proxy on the next attempt.
-            if timed_out and attempt < max_attempts:
+            if should_retry and attempt < max_attempts:
                 await asyncio.sleep(_RETRY_DELAY_SECS)
 
         return {}
