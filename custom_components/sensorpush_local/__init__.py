@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up SensorPush Local from a config entry."""
-    coordinator = SensorPushCoordinator(hass)
+    coordinator = SensorPushCoordinator(hass, entry)
 
     await coordinator.async_config_entry_first_refresh()
 
@@ -50,15 +50,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class SensorPushCoordinator(DataUpdateCoordinator):
     """Manage Bluetooth audits centrally with a global lock."""
 
-    def __init__(self, hass: HomeAssistant):
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(hours=24),
+            config_entry=entry,
         )
         self.lock = asyncio.Lock()
-        self.data = {}  # Prevent initial NoneType errors
+        self.data = {}
 
     def is_audit_locked(self) -> bool:
         """Check if the shared lock is currently held."""
