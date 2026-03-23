@@ -55,6 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Schedule the recurring daily audit at 3am local time.
     def _handle_daily_audit(_now):
+        _LOGGER.info("Scheduled daily SensorPush Local audit firing (hour=%d)", _DAILY_AUDIT_HOUR)
         hass.async_create_task(
             coordinator.async_refresh(),
             "sensorpush_local_daily_audit",
@@ -151,7 +152,6 @@ class SensorPushCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("Audit for %s (%s) deferred: Lock is held...", name, mac)
                 return {}
 
-            timed_out = False
             async with self.lock:
                 ble_device = bluetooth.async_ble_device_from_address(self.hass, mac, connectable=True)
                 if not ble_device:

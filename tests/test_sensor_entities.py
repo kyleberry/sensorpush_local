@@ -176,3 +176,41 @@ async def test_new_device_no_duplicate_entity(hass, mock_coordinator):
     await hass.async_block_till_done()
 
     assert len(added) == 1
+
+
+@pytest.mark.asyncio
+async def test_device_registry_listener_ignores_non_create_events(hass, mock_coordinator):
+    """Test that update/remove events on the device registry don't create entities."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
+
+    added = []
+    await async_setup_entry(hass, entry, lambda entities: added.extend(entities))
+
+    hass.bus.async_fire("device_registry_updated", {"action": "update", "device_id": "irrelevant"})
+    await hass.async_block_till_done()
+
+    assert len(added) == 0
+
+
+@pytest.mark.asyncio
+async def test_device_registry_listener_ignores_non_sensorpush_devices(hass, mock_coordinator):
+    """Test that a newly created device from a different manufacturer is ignored."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
+
+    dev_reg = dr.async_get(hass)
+    added = []
+    await async_setup_entry(hass, entry, lambda entities: added.extend(entities))
+
+    dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
+        manufacturer="Govee",
+        name="Not a SensorPush",
+    )
+    await hass.async_block_till_done()
+
+    assert len(added) == 0

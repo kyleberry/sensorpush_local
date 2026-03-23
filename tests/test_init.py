@@ -209,3 +209,34 @@ async def test_update_data_skips_device_without_bluetooth_identifier(hass, mock_
 
     result = await mock_coordinator._async_update_data()
     assert result == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
+async def test_daily_audit_callback_triggers_refresh(hass, mock_coordinator):
+    """Test that the 3am daily callback schedules an async_refresh task."""
+    mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={})
+    mock_entry.add_to_hass(hass)
+    mock_entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
+    mock_coordinator.config_entry = mock_entry
+
+    captured_callback = None
+
+    def fake_track_time_change(_hass, callback, **kwargs):
+        nonlocal captured_callback
+        captured_callback = callback
+        return lambda: None
+
+    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
+         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
+         patch.object(mock_entry, "async_create_background_task"), \
+         patch("custom_components.sensorpush_local.async_track_time_change", side_effect=fake_track_time_change):
+        await async_setup_entry(hass, mock_entry)
+
+    assert captured_callback is not None
+    mock_coordinator.async_refresh.reset_mock()
+
+    captured_callback(None)  # simulate 3am firing
+    await hass.async_block_till_done()
+
+    mock_coordinator.async_refresh.assert_called_once()
