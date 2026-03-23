@@ -119,3 +119,60 @@ async def test_sensor_async_setup_entry_creates_entities(hass, mock_coordinator)
     macs = {e._mac for e in added}
     assert macs == {"AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66"}
     assert all(isinstance(e, SensorPushVoltageSensor) for e in added)
+
+
+@pytest.mark.asyncio
+async def test_new_device_auto_creates_entity(hass, mock_coordinator):
+    """Test that a SensorPush device added after setup automatically gets an entity."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
+
+    dev_reg = dr.async_get(hass)
+    added = []
+    await async_setup_entry(hass, entry, lambda entities: added.extend(entities))
+    assert len(added) == 0  # no devices present at setup time
+
+    # Simulate a new SensorPush device appearing (e.g. paired via the official app)
+    dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
+        manufacturer=MANUFACTURER,
+        name="New Bedroom Sensor",
+    )
+    await hass.async_block_till_done()
+
+    assert len(added) == 1
+    assert isinstance(added[0], SensorPushVoltageSensor)
+    assert added[0]._mac == "AA:BB:CC:DD:EE:FF"
+
+
+@pytest.mark.asyncio
+async def test_new_device_no_duplicate_entity(hass, mock_coordinator):
+    """Test that a device present at setup time doesn't get a second entity if the registry event fires."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
+
+    dev_reg = dr.async_get(hass)
+    dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
+        manufacturer=MANUFACTURER,
+        name="Existing Sensor",
+    )
+
+    added = []
+    await async_setup_entry(hass, entry, lambda entities: added.extend(entities))
+    assert len(added) == 1
+
+    # A spurious update event for the same device should not create a second entity
+    hass.bus.async_fire(
+        "device_registry_updated",
+        {"action": "create", "device_id": next(
+            d.id for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER
+        )},
+    )
+    await hass.async_block_till_done()
+
+    assert len(added) == 1

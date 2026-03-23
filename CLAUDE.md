@@ -49,6 +49,8 @@ RSSI is obtained from `bluetooth.async_last_service_info(hass, mac)` before conn
 
 **`custom_components/sensorpush_local/sensor.py`** — `SensorPushVoltageSensor` pulls from coordinator cache keyed by MAC address. The entity is named "Battery Voltage" and defaults to 2 decimal places via `_attr_suggested_display_precision`. Extra state attributes include `rssi_at_read`, `proxy_source`, `raw_value`, `temp_at_read` (raw `uint16` from device — units are device-dependent, not calibrated °C), `last_audit`, and `model_type`.
 
+`async_setup_entry` registers a `EVENT_DEVICE_REGISTRY_UPDATED` listener via `entry.async_on_unload` so that new SensorPush devices added after setup automatically get an entity without requiring an integration reload. A `known_macs` set prevents duplicates.
+
 **`custom_components/sensorpush_local/config_flow.py`** — Single-instance only; no user input beyond clicking through.
 
 ### Data Flow
