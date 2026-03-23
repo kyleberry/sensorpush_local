@@ -15,6 +15,7 @@ def _mock_service_info(source="hci0", rssi=-60):
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_audit_timeout_exhausted_after_retries(hass, mock_coordinator, caplog):
     """Test that all retry attempts are made and the final timeout is logged."""
     coordinator = mock_coordinator
