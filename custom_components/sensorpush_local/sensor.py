@@ -7,6 +7,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, MANUFACTURER
 
@@ -19,14 +20,13 @@ async def async_setup_entry(hass, entry, async_add_entities):
     from homeassistant.helpers import device_registry as dr
 
     dev_reg = dr.async_get(hass)
-    known_macs = set()
+    ent_reg = async_get_entity_registry(hass)
     entities = []
 
     for device in [d for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER]:
         mac = next((i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None)
         if mac:
             entities.append(SensorPushVoltageSensor(coordinator, device, mac))
-            known_macs.add(mac)
 
     async_add_entities(entities)
 
@@ -38,9 +38,12 @@ async def async_setup_entry(hass, entry, async_add_entities):
         if not device or device.manufacturer != MANUFACTURER:
             return
         mac = next((i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None)
-        if mac and mac not in known_macs:
-            known_macs.add(mac)
-            async_add_entities([SensorPushVoltageSensor(coordinator, device, mac)])
+        if not mac:
+            return
+        uid = f"sp_{mac.replace(':', '').lower()}_volt_native"
+        if ent_reg.async_get_entity_id("sensor", DOMAIN, uid):
+            return
+        async_add_entities([SensorPushVoltageSensor(coordinator, device, mac)])
 
     entry.async_on_unload(
         hass.bus.async_listen(EVENT_DEVICE_REGISTRY_UPDATED, _handle_device_registry_update)

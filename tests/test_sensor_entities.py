@@ -4,6 +4,7 @@ from homeassistant.helpers import device_registry as dr
 from custom_components.sensorpush_local.const import DOMAIN, MANUFACTURER
 from custom_components.sensorpush_local.sensor import SensorPushVoltageSensor, async_setup_entry
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 
 @pytest.mark.asyncio
 async def test_sensor_state_reporting(hass, mock_coordinator):
@@ -149,13 +150,13 @@ async def test_new_device_auto_creates_entity(hass, mock_coordinator):
 
 @pytest.mark.asyncio
 async def test_new_device_no_duplicate_entity(hass, mock_coordinator):
-    """Test that a device present at setup time doesn't get a second entity if the registry event fires."""
+    """Test that a device whose entity already exists in the registry doesn't get a second entity."""
     entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
     entry.add_to_hass(hass)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
 
     dev_reg = dr.async_get(hass)
-    dev_reg.async_get_or_create(
+    device = dev_reg.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
         manufacturer=MANUFACTURER,
@@ -166,12 +167,14 @@ async def test_new_device_no_duplicate_entity(hass, mock_coordinator):
     await async_setup_entry(hass, entry, lambda entities: added.extend(entities))
     assert len(added) == 1
 
-    # A spurious update event for the same device should not create a second entity
+    # Simulate the entity already being in the registry (as HA would do via real async_add_entities)
+    ent_reg = async_get_entity_registry(hass)
+    ent_reg.async_get_or_create("sensor", DOMAIN, "sp_aabbccddeeff_volt_native", config_entry=entry)
+
+    # A spurious create event for the same device should now be skipped
     hass.bus.async_fire(
         "device_registry_updated",
-        {"action": "create", "device_id": next(
-            d.id for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER
-        )},
+        {"action": "create", "device_id": device.id},
     )
     await hass.async_block_till_done()
 
@@ -210,6 +213,29 @@ async def test_device_registry_listener_ignores_non_sensorpush_devices(hass, moc
         identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
         manufacturer="Govee",
         name="Not a SensorPush",
+    )
+    await hass.async_block_till_done()
+
+    assert len(added) == 0
+
+
+@pytest.mark.asyncio
+async def test_device_registry_listener_ignores_device_without_bluetooth_identifier(hass, mock_coordinator):
+    """Test that a new SensorPush device without a bluetooth identifier is skipped."""
+    entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
+
+    dev_reg = dr.async_get(hass)
+    added = []
+    await async_setup_entry(hass, entry, lambda entities: added.extend(entities))
+
+    # SensorPush device but identified by something other than bluetooth
+    dev_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("sensorpush", "12345")},
+        manufacturer=MANUFACTURER,
+        name="No BT Identifier",
     )
     await hass.async_block_till_done()
 
