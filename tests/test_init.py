@@ -33,6 +33,7 @@ async def test_run_audit_service(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_concurrent_refresh_preserves_data(hass, mock_coordinator, caplog):
     """Test that a concurrent _async_update_data call returns existing data unchanged."""
     coordinator = mock_coordinator
@@ -80,6 +81,7 @@ async def test_unload_entry(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_initial_audit_scheduled_as_background_task(hass, mock_coordinator):
     """Test that setup schedules the initial audit as a background task, not blocking startup."""
     mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={})
@@ -95,11 +97,13 @@ async def test_initial_audit_scheduled_as_background_task(hass, mock_coordinator
 
         # Verify a background task was scheduled with the expected name
         mock_bg_task.assert_called_once()
-        _, _, task_name = mock_bg_task.call_args.args
+        _, coro, task_name = mock_bg_task.call_args.args
+        coro.close()  # prevent "coroutine was never awaited" warning — mock stores but never runs it
         assert task_name == "sensorpush_local_initial_audit"
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_audit_device_not_found(hass, mock_coordinator, caplog):
     """Test that audit_device returns {} and logs when BLE device is not found."""
     with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=None):
@@ -188,6 +192,7 @@ async def test_setup_loads_persisted_data(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_update_data_skips_device_without_bluetooth_identifier(hass, mock_coordinator):
     """Test that devices lacking a bluetooth identifier are skipped silently."""
     dev_reg = dr.async_get(hass)

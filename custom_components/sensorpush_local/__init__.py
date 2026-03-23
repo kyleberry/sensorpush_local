@@ -1,12 +1,11 @@
 import logging
 import asyncio
 import struct
-from datetime import timedelta
-
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.components import bluetooth
 from homeassistant.util import dt as dt_util
 
@@ -21,6 +20,7 @@ _MAX_AUDIT_RETRIES = 2    # retries after first failure (3 total attempts)
 _RETRY_DELAY_SECS = 10    # seconds between retry attempts
 _STORAGE_KEY = f"{DOMAIN}.data"
 _STORAGE_VERSION = 1
+_DAILY_AUDIT_HOUR = 3     # run scheduled audit at 3:00am local time
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -53,6 +53,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "sensorpush_local_initial_audit",
     )
 
+    # Schedule the recurring daily audit at 3am local time.
+    def _handle_daily_audit(_now):
+        hass.async_create_task(
+            coordinator.async_refresh(),
+            "sensorpush_local_daily_audit",
+        )
+
+    coordinator._unsub_daily_audit = async_track_time_change(
+        hass, _handle_daily_audit, hour=_DAILY_AUDIT_HOUR, minute=0, second=0
+    )
+
     return True
 
 
@@ -60,7 +71,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        coordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        if coordinator._unsub_daily_audit:
+            coordinator._unsub_daily_audit()
         hass.services.async_remove(DOMAIN, "run_audit")
     return unload_ok
 
@@ -73,12 +86,13 @@ class SensorPushCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(hours=24),
+            update_interval=None,
             config_entry=entry,
         )
         self.lock = asyncio.Lock()
         self.data = {}
         self._store = Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
+        self._unsub_daily_audit = None
 
     def is_audit_locked(self) -> bool:
         """Check if the shared lock is currently held."""
