@@ -37,7 +37,7 @@ This is a Home Assistant custom integration that provides 100% local Bluetooth m
 
 **`custom_components/sensorpush_local/__init__.py`** — `SensorPushCoordinator` (extends `DataUpdateCoordinator`) is the heart of the integration. It:
 - Discovers registered SensorPush devices dynamically from the HA device registry
-- Performs GATT audits on a fixed daily schedule at 3:00am local time (`_DAILY_AUDIT_HOUR = 3`), registered via `async_track_time_change` (`update_interval` is `None`). The unsub callback is stored on `coordinator._unsub_daily_audit` and called during unload.
+- Performs GATT audits on a fixed daily schedule at a configurable hour (default 3:00am local time), registered via `async_track_time_change` (`update_interval` is `None`). The hour is read from `entry.options.get(CONF_DAILY_AUDIT_HOUR, DEFAULT_DAILY_AUDIT_HOUR)`. The unsub callback is stored on `coordinator._unsub_daily_audit` and called during unload.
 - Schedules the initial audit as a background task on setup (not blocking — `async_config_entry_first_refresh` is intentionally not used; GATT connections take 10–45s per device and would exceed HA's stage 2 bootstrap timeout). The 3am recurring schedule is separate from this and fires independently each day.
 - Exposes a `sensorpush_local.run_audit` service to trigger manual audits
 
@@ -51,7 +51,9 @@ RSSI is obtained from `bluetooth.async_last_service_info(hass, mac)` before conn
 
 `async_setup_entry` registers a `EVENT_DEVICE_REGISTRY_UPDATED` listener via `entry.async_on_unload` so that new SensorPush devices added after setup automatically get an entity without requiring an integration reload. Deduplication is handled by checking HA's entity registry (`async_get_entity_id`) rather than an in-memory set — this correctly handles device removal and re-addition without requiring an integration reload.
 
-**`custom_components/sensorpush_local/config_flow.py`** — Single-instance only; no user input beyond clicking through.
+**`custom_components/sensorpush_local/config_flow.py`** — Single-instance only; no user input beyond clicking through. Exposes an `OptionsFlowHandler` with two configurable fields: `daily_audit_hour` (0–23, default 3) and `max_retries` (0–5, default 2), rendered as integer number boxes. Changing options triggers an entry reload via `entry.add_update_listener` → `_async_reload_entry`.
+
+**`custom_components/sensorpush_local/diagnostics.py`** — Implements the HA diagnostics platform (`async_get_config_entry_diagnostics`). Returns current option values, coordinator state (device count, lock state, last update success), and per-device audit data (voltage, RSSI, proxy source, model type, last audit timestamp).
 
 ### Data Flow
 
@@ -79,7 +81,8 @@ HA startup / 3am daily schedule / manual service call
 |------|---------------|
 | `tests/test_init.py` | Coordinator logic: service registration, unload, lock behaviour, background task scheduling, `_async_update_data`, `audit_device` error paths |
 | `tests/test_sensor_entities.py` | `SensorPushVoltageSensor` entity: state, attributes, availability, `async_setup_entry` entity creation |
-| `tests/test_config_flow.py` | Config flow: form display, entry creation, single-instance abort |
+| `tests/test_config_flow.py` | Config flow: form display, entry creation, single-instance abort, options flow defaults and save |
+| `tests/test_diagnostics.py` | Diagnostics: default options output, custom options + live device data |
 | `tests/test_sensor.py` | `audit_device` happy paths: model detection, voltage math, RSSI/source from service_info, scanner name resolution, timeout/lock/malformed-payload error paths |
 
 ### Test Fixtures

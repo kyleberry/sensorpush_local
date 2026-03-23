@@ -12,15 +12,17 @@ from homeassistant.util import dt as dt_util
 from bleak import BleakError
 from bleak_retry_connector import establish_connection, BleakClientWithServiceCache as BleakClient
 
-from .const import DOMAIN, CHAR_BATTERY, CHAR_MODEL, MANUFACTURER
+from .const import (
+    DOMAIN, CHAR_BATTERY, CHAR_MODEL, MANUFACTURER,
+    CONF_DAILY_AUDIT_HOUR, CONF_MAX_RETRIES,
+    DEFAULT_DAILY_AUDIT_HOUR, DEFAULT_MAX_RETRIES,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-_MAX_AUDIT_RETRIES = 2    # retries after first failure (3 total attempts)
 _RETRY_DELAY_SECS = 10    # seconds between retry attempts
 _STORAGE_KEY = f"{DOMAIN}.data"
 _STORAGE_VERSION = 1
-_DAILY_AUDIT_HOUR = 3     # run scheduled audit at 3:00am local time
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -53,19 +55,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "sensorpush_local_initial_audit",
     )
 
-    # Schedule the recurring daily audit at 3am local time.
+    # Schedule the recurring daily audit at the configured hour.
+    daily_hour = entry.options.get(CONF_DAILY_AUDIT_HOUR, DEFAULT_DAILY_AUDIT_HOUR)
+
     def _handle_daily_audit(_now):
-        _LOGGER.info("Scheduled daily SensorPush Local audit firing (hour=%d)", _DAILY_AUDIT_HOUR)
+        _LOGGER.info("Scheduled daily SensorPush Local audit firing (hour=%d)", daily_hour)
         hass.async_create_task(
             coordinator.async_refresh(),
             "sensorpush_local_daily_audit",
         )
 
     coordinator._unsub_daily_audit = async_track_time_change(
-        hass, _handle_daily_audit, hour=_DAILY_AUDIT_HOUR, minute=0, second=0
+        hass, _handle_daily_audit, hour=int(daily_hour), minute=0, second=0
     )
 
+    # Reload the entry when options change so the new schedule/retry values take effect.
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+
     return True
+
+
+async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the config entry when options are updated."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -138,14 +150,16 @@ class SensorPushCoordinator(DataUpdateCoordinator):
         return new_data
 
     async def audit_device(self, mac: str, name: str):
-        """Perform a GATT audit, retrying on timeout or BLE errors up to _MAX_AUDIT_RETRIES times.
+        """Perform a GATT audit, retrying on timeout or BLE errors.
 
+        Retry count is read from entry options at call time (default: DEFAULT_MAX_RETRIES).
         The lock is released between retry attempts so that other devices in the
         audit queue are not blocked during the backoff sleep.  Each attempt calls
         async_ble_device_from_address fresh, so a retry may be routed to a
         different (now-free) proxy than the one that failed.
         """
-        max_attempts = _MAX_AUDIT_RETRIES + 1
+        max_retries = self.config_entry.options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES)
+        max_attempts = int(max_retries) + 1
 
         for attempt in range(1, max_attempts + 1):
             if self.is_audit_locked():
