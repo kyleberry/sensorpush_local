@@ -37,8 +37,8 @@ This is a Home Assistant custom integration that provides 100% local Bluetooth m
 
 **`custom_components/sensorpush_local/__init__.py`** — `SensorPushCoordinator` (extends `DataUpdateCoordinator`) is the heart of the integration. It:
 - Discovers registered SensorPush devices dynamically from the HA device registry
-- Performs GATT audits on a 24-hour schedule, with a global `asyncio.Lock()` to prevent concurrent Bluetooth proxy contention
-- Schedules the initial audit as a background task on setup (not blocking — `async_config_entry_first_refresh` is intentionally not used; GATT connections take 10–45s per device and would exceed HA's stage 2 bootstrap timeout)
+- Performs GATT audits on a fixed daily schedule at 3:00am local time (`_DAILY_AUDIT_HOUR = 3`), registered via `async_track_time_change` (`update_interval` is `None`). The unsub callback is stored on `coordinator._unsub_daily_audit` and called during unload.
+- Schedules the initial audit as a background task on setup (not blocking — `async_config_entry_first_refresh` is intentionally not used; GATT connections take 10–45s per device and would exceed HA's stage 2 bootstrap timeout). The 3am recurring schedule is separate from this and fires independently each day.
 - Exposes a `sensorpush_local.run_audit` service to trigger manual audits
 
 **`audit_device()`** reads two GATT characteristics (Model and Battery UUIDs in `const.py`) and applies hardware-generation-specific voltage math:
@@ -54,7 +54,7 @@ RSSI is obtained from `bluetooth.async_last_service_info(hass, mac)` before conn
 ### Data Flow
 
 ```
-HA startup / manual service call
+HA startup / 3am daily schedule / manual service call
   → SensorPushCoordinator._async_update_data()
     → early exit if lock is already held (preserves existing data)
     → device_registry lookup (dynamic discovery)
