@@ -240,3 +240,24 @@ async def test_daily_audit_callback_triggers_refresh(hass, mock_coordinator):
     await hass.async_block_till_done()
 
     mock_coordinator.async_refresh.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
+async def test_options_update_triggers_reload(hass, mock_coordinator):
+    """Test that updating options calls async_reload on the config entry."""
+    mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={}, options={})
+    mock_entry.add_to_hass(hass)
+    mock_entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
+    mock_coordinator.config_entry = mock_entry
+
+    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
+         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
+         patch.object(mock_entry, "async_create_background_task"), \
+         patch("custom_components.sensorpush_local.async_track_time_change", return_value=lambda: None):
+        await async_setup_entry(hass, mock_entry)
+
+    with patch.object(hass.config_entries, "async_reload") as mock_reload:
+        hass.config_entries.async_update_entry(mock_entry, options={"daily_audit_hour": 6})
+        await hass.async_block_till_done()
+        mock_reload.assert_called_once_with(mock_entry.entry_id)
