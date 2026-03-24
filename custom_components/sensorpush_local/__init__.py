@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import struct
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.storage import Store
@@ -58,6 +58,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Schedule the recurring daily audit at the configured hour.
     daily_hour = entry.options.get(CONF_DAILY_AUDIT_HOUR, DEFAULT_DAILY_AUDIT_HOUR)
 
+    @callback
     def _handle_daily_audit(_now):
         _LOGGER.info("Scheduled daily SensorPush Local audit firing (hour=%d)", daily_hour)
         hass.async_create_task(
@@ -133,6 +134,7 @@ class SensorPushCoordinator(DataUpdateCoordinator):
         # Find all devices from the 'SensorPush' manufacturer
         sensor_devices = [d for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER]
 
+        updated = 0
         for device in sensor_devices:
             mac = next((i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None)
             if not mac:
@@ -145,7 +147,9 @@ class SensorPushCoordinator(DataUpdateCoordinator):
 
             if result:
                 new_data[mac] = result
+                updated += 1
 
+        _LOGGER.info("SensorPush Local audit complete — %d/%d device(s) updated", updated, len(sensor_devices))
         await self._store.async_save(new_data)
         return new_data
 
@@ -162,6 +166,7 @@ class SensorPushCoordinator(DataUpdateCoordinator):
         max_attempts = int(max_retries) + 1
 
         for attempt in range(1, max_attempts + 1):
+            should_retry = False
             if self.is_audit_locked():
                 _LOGGER.debug("Audit for %s (%s) deferred: Lock is held...", name, mac)
                 return {}
