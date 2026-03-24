@@ -1,7 +1,7 @@
 import logging
 import asyncio
 import struct
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.storage import Store
@@ -58,6 +58,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Schedule the recurring daily audit at the configured hour.
     daily_hour = entry.options.get(CONF_DAILY_AUDIT_HOUR, DEFAULT_DAILY_AUDIT_HOUR)
 
+    @callback
     def _handle_daily_audit(_now):
         _LOGGER.info("Scheduled daily SensorPush Local audit firing (hour=%d)", daily_hour)
         hass.async_create_task(
