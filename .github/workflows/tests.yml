@@ -20,7 +20,7 @@ jobs:
           apt-get install -y build-essential libudev-dev bluez git
 
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install Python Dependencies
         run: |
