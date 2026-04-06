@@ -1,7 +1,7 @@
 # SensorPush Local (Native)
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)
 
 A high-precision, **100% local** Home Assistant integration for SensorPush sensors. This integration bypasses the Cloud API and uses Bluetooth Proxies to perform active battery audits, providing millivolt-accurate data even for sensors inside appliances like fridges or freezers.
 
@@ -18,11 +18,11 @@ A high-precision, **100% local** Home Assistant integration for SensorPush senso
 
 ### Option 1: HACS (Recommended)
 
-1. Open **HACS** in Home Assistant.
-2. Click the three dots in the top right and select **Custom repositories**.
-3. Paste the URL of this repository and select **Integration** as the category.
-4. Click **Install**.
-5. Restart Home Assistant.
+[![Open your Home Assistant instance and add a custom repository.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=kyleberry&repository=sensorpush_local&category=integration)
+
+1. Click the button above, or open **HACS** and add this repository manually as a custom repository under the **Integration** category.
+2. Click **Install**.
+3. Restart Home Assistant.
 
 ### Option 2: Manual
 
