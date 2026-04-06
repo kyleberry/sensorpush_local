@@ -1,19 +1,24 @@
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+
 from custom_components.sensorpush_local.const import (
-    DOMAIN,
     CONF_DAILY_AUDIT_HOUR,
     CONF_MAX_RETRIES,
     DEFAULT_DAILY_AUDIT_HOUR,
     DEFAULT_MAX_RETRIES,
+    DOMAIN,
 )
-from custom_components.sensorpush_local.diagnostics import async_get_config_entry_diagnostics
+from custom_components.sensorpush_local.diagnostics import (
+    async_get_config_entry_diagnostics,
+)
 
 
 @pytest.mark.asyncio
 async def test_diagnostics_default_options(hass, mock_coordinator):
     """Test diagnostics output when no options are set (shows defaults)."""
-    entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={}, options={})
+    entry = MockConfigEntry(
+        domain=DOMAIN, entry_id="mock_entry_id", data={}, options={}
+    )
     entry.add_to_hass(hass)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
     mock_coordinator.data = {}

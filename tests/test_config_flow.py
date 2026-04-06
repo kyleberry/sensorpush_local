@@ -1,22 +1,27 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 from homeassistant import config_entries, data_entry_flow
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.sensorpush_local.config_flow import SensorPushConfigFlow
 from custom_components.sensorpush_local.const import (
-    DOMAIN,
     CONF_DAILY_AUDIT_HOUR,
     CONF_MAX_RETRIES,
-    DEFAULT_DAILY_AUDIT_HOUR,
-    DEFAULT_MAX_RETRIES,
+    DOMAIN,
 )
-from custom_components.sensorpush_local.config_flow import SensorPushConfigFlow, OptionsFlowHandler
 
 
 def _flow_patches(mock_integration):
     """Return the standard loader patches needed to init a config flow."""
     return (
-        patch("homeassistant.loader.async_get_integration", return_value=mock_integration),
-        patch("homeassistant.requirements.async_get_integration_with_requirements", return_value=mock_integration),
+        patch(
+            "homeassistant.loader.async_get_integration", return_value=mock_integration
+        ),
+        patch(
+            "homeassistant.requirements.async_get_integration_with_requirements",
+            return_value=mock_integration,
+        ),
         patch("homeassistant.setup.async_process_deps_reqs", return_value=True),
     )
 
@@ -101,7 +106,9 @@ async def test_single_instance_abort_direct(hass):
 @pytest.mark.asyncio
 async def test_options_flow_shows_defaults(hass):
     """Test that the options form shows default values when no options are set."""
-    entry = MockConfigEntry(domain=DOMAIN, entry_id="test_options_id", data={}, options={})
+    entry = MockConfigEntry(
+        domain=DOMAIN, entry_id="test_options_id", data={}, options={}
+    )
     entry.add_to_hass(hass)
 
     mock_integration = AsyncMock()
@@ -122,7 +129,9 @@ async def test_options_flow_shows_defaults(hass):
 @pytest.mark.asyncio
 async def test_options_flow_saves_values(hass):
     """Test that submitting the options form persists the chosen values."""
-    entry = MockConfigEntry(domain=DOMAIN, entry_id="test_options_id", data={}, options={})
+    entry = MockConfigEntry(
+        domain=DOMAIN, entry_id="test_options_id", data={}, options={}
+    )
     entry.add_to_hass(hass)
 
     mock_integration = AsyncMock()

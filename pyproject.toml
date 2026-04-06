@@ -21,6 +21,11 @@ test = [
     "pytest-asyncio",
     "pytest-cov",
     "argcomplete",
+    "black",
+    "flake8",
+    "flake8-pyproject",
+    "isort",
+    "pylint",
 ]
 
 [tool.pytest.ini_options]
@@ -33,3 +38,9 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore:inotify is a Linux and FreeBSD API:UserWarning",
 ]
+
+[tool.black]
+line-length = 88
+
+[tool.isort]
+profile = "black"

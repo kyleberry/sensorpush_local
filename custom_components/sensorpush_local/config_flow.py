@@ -6,17 +6,21 @@ from homeassistant.helpers.selector import (
     NumberSelectorConfig,
     NumberSelectorMode,
 )
+
 from .const import (
-    DOMAIN,
     CONF_DAILY_AUDIT_HOUR,
     CONF_MAX_RETRIES,
     DEFAULT_DAILY_AUDIT_HOUR,
     DEFAULT_MAX_RETRIES,
+    DOMAIN,
 )
 
 
-class SensorPushConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class SensorPushConfigFlow(
+    config_entries.ConfigFlow, domain=DOMAIN
+):  # pylint: disable=abstract-method
     """Handle a config flow for SensorPush Local."""
+
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
@@ -44,18 +48,26 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         options = self.config_entry.options
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema({
-                vol.Optional(
-                    CONF_DAILY_AUDIT_HOUR,
-                    default=options.get(CONF_DAILY_AUDIT_HOUR, DEFAULT_DAILY_AUDIT_HOUR),
-                ): NumberSelector(NumberSelectorConfig(
-                    min=0, max=23, step=1, mode=NumberSelectorMode.BOX
-                )),
-                vol.Optional(
-                    CONF_MAX_RETRIES,
-                    default=options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES),
-                ): NumberSelector(NumberSelectorConfig(
-                    min=0, max=5, step=1, mode=NumberSelectorMode.BOX
-                )),
-            }),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_DAILY_AUDIT_HOUR,
+                        default=options.get(
+                            CONF_DAILY_AUDIT_HOUR, DEFAULT_DAILY_AUDIT_HOUR
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0, max=23, step=1, mode=NumberSelectorMode.BOX
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_MAX_RETRIES,
+                        default=options.get(CONF_MAX_RETRIES, DEFAULT_MAX_RETRIES),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0, max=5, step=1, mode=NumberSelectorMode.BOX
+                        )
+                    ),
+                }
+            ),
         )
