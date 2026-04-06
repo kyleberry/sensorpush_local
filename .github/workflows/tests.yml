@@ -30,3 +30,19 @@ jobs:
       - name: Run Tests
         run: |
           pytest tests/
+
+      - name: Check formatting (black)
+        run: |
+          black --check --target-version py313 custom_components/ tests/
+
+      - name: Check import order (isort)
+        run: |
+          isort --check-only custom_components/ tests/
+
+      - name: Lint (flake8)
+        run: |
+          flake8 custom_components/ tests/
+
+      - name: Lint (pylint)
+        run: |
+          pylint custom_components/ tests/ --fail-under=9.5

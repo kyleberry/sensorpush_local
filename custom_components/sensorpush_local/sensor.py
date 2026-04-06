@@ -1,14 +1,17 @@
 import logging
-from homeassistant.core import callback
+
 from homeassistant.components.sensor import (
-    SensorEntity,
     SensorDeviceClass,
+    SensorEntity,
     SensorStateClass,
 )
+from homeassistant.core import callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
 from .const import DOMAIN, MANUFACTURER
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,14 +20,16 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up SensorPush entities from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    from homeassistant.helpers import device_registry as dr
-
     dev_reg = dr.async_get(hass)
     ent_reg = async_get_entity_registry(hass)
     entities = []
 
-    for device in [d for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER]:
-        mac = next((i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None)
+    for device in [
+        d for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER
+    ]:
+        mac = next(
+            (i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None
+        )
         if mac:
             entities.append(SensorPushVoltageSensor(coordinator, device, mac))
 
@@ -37,7 +42,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         device = dev_reg.async_get(event.data["device_id"])
         if not device or device.manufacturer != MANUFACTURER:
             return
-        mac = next((i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None)
+        mac = next(
+            (i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None
+        )
         if not mac:
             return
         uid = f"sp_{mac.replace(':', '').lower()}_volt_native"
@@ -46,7 +53,9 @@ async def async_setup_entry(hass, entry, async_add_entities):
         async_add_entities([SensorPushVoltageSensor(coordinator, device, mac)])
 
     entry.async_on_unload(
-        hass.bus.async_listen(EVENT_DEVICE_REGISTRY_UPDATED, _handle_device_registry_update)
+        hass.bus.async_listen(
+            EVENT_DEVICE_REGISTRY_UPDATED, _handle_device_registry_update
+        )
     )
 
 
@@ -91,7 +100,11 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
             "raw_value": device_data.get("raw_v"),
             "temp_at_read": device_data.get("temp_at_read"),
             "last_audit": device_data.get("timestamp"),
-            "model_type": "Legacy (HT1)" if device_data.get("is_legacy") else "Modern (HT.w/HTP.xw)"
+            "model_type": (
+                "Legacy (HT1)"
+                if device_data.get("is_legacy")
+                else "Modern (HT.w/HTP.xw)"
+            ),
         }
 
     @property

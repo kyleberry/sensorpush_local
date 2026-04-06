@@ -1,11 +1,13 @@
-import asyncio
+# pylint: disable=unused-argument,protected-access
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from custom_components.sensorpush_local.const import DOMAIN, MANUFACTURER
-from custom_components.sensorpush_local import async_setup_entry, async_unload_entry
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import device_registry as dr
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.sensorpush_local import async_setup_entry, async_unload_entry
+from custom_components.sensorpush_local.const import DOMAIN, MANUFACTURER
 
 
 @pytest.mark.asyncio
@@ -20,9 +22,14 @@ async def test_run_audit_service(hass, mock_coordinator):
     # 2. Link them up
     mock_coordinator.config_entry = mock_entry
 
-    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
-         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
-         patch.object(mock_entry, "async_create_background_task"):
+    with (
+        patch(
+            "custom_components.sensorpush_local.SensorPushCoordinator",
+            return_value=mock_coordinator,
+        ),
+        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
+        patch.object(mock_entry, "async_create_background_task"),
+    ):
 
         await async_setup_entry(hass, mock_entry)
         mock_coordinator.async_refresh.reset_mock()
@@ -66,10 +73,18 @@ async def test_unload_entry(hass, mock_coordinator):
     mock_entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
     mock_coordinator.config_entry = mock_entry
 
-    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
-         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
-         patch("homeassistant.config_entries.ConfigEntries.async_unload_platforms", return_value=True), \
-         patch.object(mock_entry, "async_create_background_task"):
+    with (
+        patch(
+            "custom_components.sensorpush_local.SensorPushCoordinator",
+            return_value=mock_coordinator,
+        ),
+        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
+        patch(
+            "homeassistant.config_entries.ConfigEntries.async_unload_platforms",
+            return_value=True,
+        ),
+        patch.object(mock_entry, "async_create_background_task"),
+    ):
 
         await async_setup_entry(hass, mock_entry)
         assert DOMAIN in hass.data
@@ -89,9 +104,14 @@ async def test_initial_audit_scheduled_as_background_task(hass, mock_coordinator
     mock_entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
     mock_coordinator.config_entry = mock_entry
 
-    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
-         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
-         patch.object(mock_entry, "async_create_background_task") as mock_bg_task:
+    with (
+        patch(
+            "custom_components.sensorpush_local.SensorPushCoordinator",
+            return_value=mock_coordinator,
+        ),
+        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
+        patch.object(mock_entry, "async_create_background_task") as mock_bg_task,
+    ):
 
         await async_setup_entry(hass, mock_entry)
 
@@ -106,8 +126,13 @@ async def test_initial_audit_scheduled_as_background_task(hass, mock_coordinator
 @pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_audit_device_not_found(hass, mock_coordinator, caplog):
     """Test that audit_device returns {} and logs when BLE device is not found."""
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=None):
-        result = await mock_coordinator.audit_device("AA:BB:CC:DD:EE:FF", "Missing Sensor")
+    with patch(
+        "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address",
+        return_value=None,
+    ):
+        result = await mock_coordinator.audit_device(
+            "AA:BB:CC:DD:EE:FF", "Missing Sensor"
+        )
 
     assert result == {}
     assert "not found by any proxies" in caplog.text
@@ -119,8 +144,16 @@ async def test_audit_device_general_exception(hass, mock_coordinator, caplog):
     mock_ble = MagicMock()
     mock_ble.address = "AA:BB:CC:DD:EE:FF"
 
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
-         patch("custom_components.sensorpush_local.establish_connection", side_effect=RuntimeError("proxy died")):
+    with (
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address",
+            return_value=mock_ble,
+        ),
+        patch(
+            "custom_components.sensorpush_local.establish_connection",
+            side_effect=RuntimeError("proxy died"),
+        ),
+    ):
 
         result = await mock_coordinator.audit_device("AA:BB:CC:DD:EE:FF", "Boom Sensor")
 
@@ -143,7 +176,15 @@ async def test_update_data_stores_successful_audit_result(hass, mock_coordinator
         name="Test Sensor",
     )
 
-    audit_result = {"voltage": 3.0, "rssi": -55, "is_legacy": False, "source": "hci0", "raw_v": 3000, "temp_at_read": 21.0, "timestamp": "2026-03-22T00:00:00"}
+    audit_result = {
+        "voltage": 3.0,
+        "rssi": -55,
+        "is_legacy": False,
+        "source": "hci0",
+        "raw_v": 3000,
+        "temp_at_read": 21.0,
+        "timestamp": "2026-03-22T00:00:00",
+    }
 
     with patch.object(mock_coordinator, "audit_device", return_value=audit_result):
         result = await mock_coordinator._async_update_data()
@@ -182,9 +223,14 @@ async def test_setup_loads_persisted_data(hass, mock_coordinator):
     mock_entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
     mock_coordinator.config_entry = mock_entry
 
-    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
-         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
-         patch.object(mock_entry, "async_create_background_task"):
+    with (
+        patch(
+            "custom_components.sensorpush_local.SensorPushCoordinator",
+            return_value=mock_coordinator,
+        ),
+        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
+        patch.object(mock_entry, "async_create_background_task"),
+    ):
 
         await async_setup_entry(hass, mock_entry)
 
@@ -193,7 +239,9 @@ async def test_setup_loads_persisted_data(hass, mock_coordinator):
 
 @pytest.mark.asyncio
 @pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
-async def test_update_data_skips_device_without_bluetooth_identifier(hass, mock_coordinator):
+async def test_update_data_skips_device_without_bluetooth_identifier(
+    hass, mock_coordinator
+):
     """Test that devices lacking a bluetooth identifier are skipped silently."""
     dev_reg = dr.async_get(hass)
     mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
@@ -227,16 +275,24 @@ async def test_daily_audit_callback_triggers_refresh(hass, mock_coordinator):
         captured_callback = callback
         return lambda: None
 
-    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
-         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
-         patch.object(mock_entry, "async_create_background_task"), \
-         patch("custom_components.sensorpush_local.async_track_time_change", side_effect=fake_track_time_change):
+    with (
+        patch(
+            "custom_components.sensorpush_local.SensorPushCoordinator",
+            return_value=mock_coordinator,
+        ),
+        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
+        patch.object(mock_entry, "async_create_background_task"),
+        patch(
+            "custom_components.sensorpush_local.async_track_time_change",
+            side_effect=fake_track_time_change,
+        ),
+    ):
         await async_setup_entry(hass, mock_entry)
 
     assert captured_callback is not None
     mock_coordinator.async_refresh.reset_mock()
 
-    captured_callback(None)  # simulate 3am firing
+    captured_callback(None)  # pylint: disable=not-callable  # simulate 3am firing
     await hass.async_block_till_done()
 
     mock_coordinator.async_refresh.assert_called_once()
@@ -251,13 +307,23 @@ async def test_options_update_triggers_reload(hass, mock_coordinator):
     mock_entry.mock_state(hass, ConfigEntryState.SETUP_IN_PROGRESS)
     mock_coordinator.config_entry = mock_entry
 
-    with patch("custom_components.sensorpush_local.SensorPushCoordinator", return_value=mock_coordinator), \
-         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"), \
-         patch.object(mock_entry, "async_create_background_task"), \
-         patch("custom_components.sensorpush_local.async_track_time_change", return_value=lambda: None):
+    with (
+        patch(
+            "custom_components.sensorpush_local.SensorPushCoordinator",
+            return_value=mock_coordinator,
+        ),
+        patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
+        patch.object(mock_entry, "async_create_background_task"),
+        patch(
+            "custom_components.sensorpush_local.async_track_time_change",
+            return_value=lambda: None,
+        ),
+    ):
         await async_setup_entry(hass, mock_entry)
 
     with patch.object(hass.config_entries, "async_reload") as mock_reload:
-        hass.config_entries.async_update_entry(mock_entry, options={"daily_audit_hour": 6})
+        hass.config_entries.async_update_entry(
+            mock_entry, options={"daily_audit_hour": 6}
+        )
         await hass.async_block_till_done()
         mock_reload.assert_called_once_with(mock_entry.entry_id)

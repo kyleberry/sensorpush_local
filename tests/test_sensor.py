@@ -1,9 +1,11 @@
+# pylint: disable=unused-argument
 import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
 from bleak import BleakError
-from custom_components.sensorpush_local.const import DOMAIN
-from .const import MOCK_MODEL_HTW, MOCK_MODEL_HT1, MOCK_BATT_860MV, MOCK_BATT_MALFORMED
+
+from .const import MOCK_BATT_860MV, MOCK_BATT_MALFORMED, MOCK_MODEL_HT1, MOCK_MODEL_HTW
 
 
 def _mock_service_info(source="hci0", rssi=-60):
@@ -23,10 +25,18 @@ async def test_audit_timeout_exhausted_after_retries(hass, mock_coordinator, cap
     mock_ble = MagicMock()
     mock_ble.address = "AA:BB:CC:DD:EE:FF"
 
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
-         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=_mock_service_info()), \
-         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
-         patch("asyncio.sleep") as mock_sleep:
+    with (
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address",
+            return_value=mock_ble,
+        ),
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_last_service_info",
+            return_value=_mock_service_info(),
+        ),
+        patch("custom_components.sensorpush_local.establish_connection") as mock_conn,
+        patch("asyncio.sleep") as mock_sleep,
+    ):
 
         mock_client = AsyncMock()
         mock_client.read_gatt_char.side_effect = asyncio.TimeoutError
@@ -43,7 +53,6 @@ async def test_audit_timeout_exhausted_after_retries(hass, mock_coordinator, cap
 @pytest.mark.asyncio
 async def test_retry_succeeds_on_second_attempt(hass, mock_coordinator, caplog):
     """Test that a timeout on the first attempt is retried and succeeds."""
-    from tests.const import MOCK_MODEL_HTW, MOCK_BATT_860MV
     coordinator = mock_coordinator
 
     mock_ble = MagicMock()
@@ -52,18 +61,29 @@ async def test_retry_succeeds_on_second_attempt(hass, mock_coordinator, caplog):
     mock_scanner = MagicMock()
     mock_scanner.name = "Living Room Hub"
 
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
-         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=_mock_service_info()), \
-         patch("custom_components.sensorpush_local.bluetooth.async_scanner_by_source", return_value=mock_scanner), \
-         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
-         patch("asyncio.sleep") as mock_sleep:
+    with (
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address",
+            return_value=mock_ble,
+        ),
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_last_service_info",
+            return_value=_mock_service_info(),
+        ),
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_scanner_by_source",
+            return_value=mock_scanner,
+        ),
+        patch("custom_components.sensorpush_local.establish_connection") as mock_conn,
+        patch("asyncio.sleep") as mock_sleep,
+    ):
 
         mock_client = AsyncMock()
         # First read_gatt_char call times out; second attempt returns valid data
         mock_client.read_gatt_char.side_effect = [
-            asyncio.TimeoutError,   # attempt 1: model char times out
-            MOCK_MODEL_HTW,         # attempt 2: model char OK
-            MOCK_BATT_860MV,        # attempt 2: battery char OK
+            asyncio.TimeoutError,  # attempt 1: model char times out
+            MOCK_MODEL_HTW,  # attempt 2: model char OK
+            MOCK_BATT_860MV,  # attempt 2: battery char OK
         ]
         mock_conn.return_value.__aenter__.return_value = mock_client
 
@@ -82,9 +102,17 @@ async def test_malformed_battery_payload(hass, mock_coordinator, caplog):
     mock_ble = MagicMock()
     mock_ble.address = "AA:BB:CC:DD:EE:FF"
 
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
-         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=_mock_service_info()), \
-         patch("custom_components.sensorpush_local.establish_connection") as mock_conn:
+    with (
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address",
+            return_value=mock_ble,
+        ),
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_last_service_info",
+            return_value=_mock_service_info(),
+        ),
+        patch("custom_components.sensorpush_local.establish_connection") as mock_conn,
+    ):
 
         mock_client = AsyncMock()
         mock_client.read_gatt_char.side_effect = [MOCK_MODEL_HT1, MOCK_BATT_MALFORMED]
@@ -120,10 +148,20 @@ async def test_model_detection_logic(hass, mock_coordinator):
     mock_scanner = MagicMock()
     mock_scanner.name = "Living Room Hub"
 
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address") as mock_bt_lookup, \
-         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=_mock_service_info(source="hci0", rssi=-60)), \
-         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
-         patch("custom_components.sensorpush_local.bluetooth.async_scanner_by_source", return_value=mock_scanner):
+    with (
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address"
+        ) as mock_bt_lookup,
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_last_service_info",
+            return_value=_mock_service_info(source="hci0", rssi=-60),
+        ),
+        patch("custom_components.sensorpush_local.establish_connection") as mock_conn,
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_scanner_by_source",
+            return_value=mock_scanner,
+        ),
+    ):
 
         mock_client = AsyncMock()
         mock_conn.return_value.__aenter__.return_value = mock_client
@@ -159,10 +197,18 @@ async def test_bleak_error_exhausted_after_retries(hass, mock_coordinator, caplo
     mock_ble = MagicMock()
     mock_ble.address = "AA:BB:CC:DD:EE:FF"
 
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
-         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=_mock_service_info()), \
-         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
-         patch("asyncio.sleep") as mock_sleep:
+    with (
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address",
+            return_value=mock_ble,
+        ),
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_last_service_info",
+            return_value=_mock_service_info(),
+        ),
+        patch("custom_components.sensorpush_local.establish_connection") as mock_conn,
+        patch("asyncio.sleep") as mock_sleep,
+    ):
 
         mock_client = AsyncMock()
         mock_client.read_gatt_char.side_effect = BleakError("proxy died")
@@ -187,11 +233,22 @@ async def test_bleak_error_triggers_retry(hass, mock_coordinator, caplog):
     mock_scanner = MagicMock()
     mock_scanner.name = "Living Room Hub"
 
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
-         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=_mock_service_info()), \
-         patch("custom_components.sensorpush_local.bluetooth.async_scanner_by_source", return_value=mock_scanner), \
-         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
-         patch("asyncio.sleep") as mock_sleep:
+    with (
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address",
+            return_value=mock_ble,
+        ),
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_last_service_info",
+            return_value=_mock_service_info(),
+        ),
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_scanner_by_source",
+            return_value=mock_scanner,
+        ),
+        patch("custom_components.sensorpush_local.establish_connection") as mock_conn,
+        patch("asyncio.sleep") as mock_sleep,
+    ):
 
         mock_client = AsyncMock()
         # First attempt: BleakError mid-read; second attempt: success
@@ -218,10 +275,21 @@ async def test_source_and_rssi_fallback_when_service_info_none(hass, mock_coordi
     mock_ble.address = "AA:11"
     mock_ble.details = {"source": "hci0"}
 
-    with patch("custom_components.sensorpush_local.bluetooth.async_ble_device_from_address", return_value=mock_ble), \
-         patch("custom_components.sensorpush_local.bluetooth.async_last_service_info", return_value=None), \
-         patch("custom_components.sensorpush_local.establish_connection") as mock_conn, \
-         patch("custom_components.sensorpush_local.bluetooth.async_scanner_by_source", return_value=None):
+    with (
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_ble_device_from_address",
+            return_value=mock_ble,
+        ),
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_last_service_info",
+            return_value=None,
+        ),
+        patch("custom_components.sensorpush_local.establish_connection") as mock_conn,
+        patch(
+            "custom_components.sensorpush_local.bluetooth.async_scanner_by_source",
+            return_value=None,
+        ),
+    ):
 
         mock_client = AsyncMock()
         mock_client.read_gatt_char.side_effect = [MOCK_MODEL_HTW, MOCK_BATT_860MV]
