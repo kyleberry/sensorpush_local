@@ -5,6 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
+# Full pre-push check (tests + all linters)
+pytest tests/ && black --check --target-version py313 custom_components/ tests/ && isort --check-only custom_components/ tests/ && flake8 custom_components/ tests/ && pylint custom_components/ tests/
+
 # Install with test dependencies
 pip install -e .[test] --config-settings editable_mode=compat
 
@@ -20,6 +23,8 @@ pytest tests/test_init.py::test_function_name
 # Run with coverage (shows missing lines)
 pytest tests/ --cov=custom_components/sensorpush_local --cov-report=term-missing
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full contributor workflow.
 
 Tests run with `asyncio_mode = "auto"` — all async tests are automatically handled.
 
@@ -91,3 +96,26 @@ HA startup / 3am daily schedule / manual service call
 `tests/conftest.py` provides:
 - `mock_coordinator` — coordinator instance with mocked Bluetooth and a no-op `async_refresh`
 - `auto_enable_bluetooth` — enables BLE for all tests (auto-used)
+
+## Linting and formatting
+
+```bash
+black custom_components/ tests/       # format
+isort custom_components/ tests/       # sort imports
+flake8 custom_components/ tests/      # style + unused imports
+pylint custom_components/ tests/      # static analysis (threshold: 9.5/10)
+```
+
+Config: `[tool.black]` and `[tool.isort]` in `pyproject.toml`; `[flake8]` and `[pylint.messages_control]` in `setup.cfg`. All four run in CI after tests.
+
+## Version bumping
+
+Version is tracked in two files — both must match:
+- `custom_components/sensorpush_local/manifest.json`
+- `pyproject.toml`
+
+Tags follow `vX.Y.Z` convention. Create and push separately: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+## Devcontainer / ~/.claude mounts
+
+Mount only cross-platform-safe subdirectories — not `~/.claude` wholesale. Plugins are platform-specific binaries; mounting them from macOS into Linux breaks them. Safe to share: `settings.json`, `skills/`, `projects/`.
