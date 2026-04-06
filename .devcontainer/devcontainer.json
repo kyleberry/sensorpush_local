@@ -11,7 +11,9 @@
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
   "mounts": [
-    "source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached"
+    "source=${localEnv:HOME}/.claude/settings.json,target=/root/.claude/settings.json,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.claude/skills,target=/root/.claude/skills,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.claude/projects,target=/root/.claude/projects,type=bind,consistency=cached"
   ],
   "remoteUser": "root",
   "postCreateCommand": "chsh -s $(which zsh) && pip install -e .[test] --config-settings editable_mode=compat && activate-global-python-argcomplete",
