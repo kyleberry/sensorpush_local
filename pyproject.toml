@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "homeassistant",
-    "bleak-retry-connector>=3.4.0",
+    "bleak-retry-connector>=4.6.0",
     # aiousbwatcher and pyserial are not used directly by this integration
     # but are hard-imported by homeassistant.components.usb (pulled in via
     # the bluetooth stack). HA's wheel does not declare them in install_requires
