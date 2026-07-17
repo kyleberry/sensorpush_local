@@ -15,10 +15,6 @@
       "matchManagers": ["github-actions"]
     },
     {
-      "groupName": "python version",
-      "matchPackageNames": ["python"]
-    },
-    {
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
     },
@@ -29,10 +25,12 @@
     {
       "groupName": "home assistant ecosystem",
       "matchPackageNames": [
+        "python",
         "homeassistant",
         "pytest-homeassistant-custom-component",
         "bleak-retry-connector",
-        "pytest-asyncio"
+        "pytest-asyncio",
+        "pytest-cov"
       ],
       "automerge": false
     }
