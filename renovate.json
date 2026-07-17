@@ -27,7 +27,13 @@
       "automerge": false
     },
     {
-      "matchPackageNames": ["homeassistant", "bleak-retry-connector"],
+      "groupName": "home assistant ecosystem",
+      "matchPackageNames": [
+        "homeassistant",
+        "pytest-homeassistant-custom-component",
+        "bleak-retry-connector",
+        "pytest-asyncio"
+      ],
       "automerge": false
     }
   ],
