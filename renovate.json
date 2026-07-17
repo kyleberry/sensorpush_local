@@ -36,7 +36,8 @@
         "aioesphomeapi"
       ],
       "automerge": false,
-      "rangeStrategy": "bump"
+      "rangeStrategy": "bump",
+      "separateMajorMinor": false
     }
   ],
   "assignees": ["kyleberry"]
