@@ -87,6 +87,8 @@ Dependencies are managed with [uv](https://docs.astral.sh/uv/), pinned to exact 
 
 `uv.lock` embeds this project's own version number in a self-referencing entry, so `.forgejo/workflows/release.yml`'s release job runs `uv lock` again after bumping the version and includes it in the release commit — don't remove that step if you touch the release workflow.
 
+`homeassistant`, `pytest-homeassistant-custom-component`, `bleak-retry-connector`, `pytest-asyncio`, `pytest-cov`, `habluetooth`, and the `python`/`requires-python` version are grouped together in `renovate.json`'s "home assistant ecosystem" `packageRule` (with `automerge: false`) because they have hard version constraints on each other — bumping one without the others produces a combination that either can't resolve or silently installs an incompatible version. `habluetooth` in particular is transitive (pulled in by `bleak-retry-connector`/`homeassistant`, never imported directly) but pinned explicitly anyway: Renovate's `uv lock --upgrade-package X` only moves the named packages, so an undeclared transitive dependency stays frozen at whatever's already locked even when it's no longer actually compatible — declaring it gives Renovate something to name.
+
 ### Test Files
 
 | File | What it covers |

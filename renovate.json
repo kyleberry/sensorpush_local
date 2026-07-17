@@ -30,7 +30,8 @@
         "pytest-homeassistant-custom-component",
         "bleak-retry-connector",
         "pytest-asyncio",
-        "pytest-cov"
+        "pytest-cov",
+        "habluetooth"
       ],
       "automerge": false,
       "rangeStrategy": "bump"
