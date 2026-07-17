@@ -21,6 +21,15 @@ dependencies = [
     # so pip will not install them transitively. Do not remove these.
     "aiousbwatcher==1.1.2",
     "pyserial==3.5",
+    # serialx and aioesphomeapi: not needed by homeassistant==2026.2.3 (no
+    # reference in its usb component today), but a later HA release's usb
+    # component hard-imports serialx, which itself imports aioesphomeapi —
+    # same undeclared-transitive-dependency pattern as aiousbwatcher/pyserial
+    # above. Pre-declared now so the "home assistant ecosystem" Renovate
+    # group (see renovate.json) doesn't hit a fresh ModuleNotFoundError the
+    # next time homeassistant bumps far enough to need them.
+    "serialx==1.8.2",
+    "aioesphomeapi==40.0.0",
 ]
 
 [project.optional-dependencies]

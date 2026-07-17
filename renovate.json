@@ -31,7 +31,9 @@
         "bleak-retry-connector",
         "pytest-asyncio",
         "pytest-cov",
-        "habluetooth"
+        "habluetooth",
+        "serialx",
+        "aioesphomeapi"
       ],
       "automerge": false,
       "rangeStrategy": "bump"
