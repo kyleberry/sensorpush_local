@@ -110,11 +110,9 @@ Config: `[tool.black]` and `[tool.isort]` in `pyproject.toml`; `[flake8]` and `[
 
 ## Version bumping
 
-Version is tracked in two files — both must match:
-- `custom_components/sensorpush_local/manifest.json`
-- `pyproject.toml`
+Releases are automated via the `.forgejo/workflows/release.yml` workflow. Trigger it manually (`workflow_dispatch`) with a `version` input (e.g. `1.0.3`, no `v` prefix). It runs the full test/lint suite, then bumps the version in `custom_components/sensorpush_local/manifest.json`, `pyproject.toml`, and the README badge, commits, tags `vX.Y.Z`, waits for the push mirror to sync the tag to GitHub, and creates the GitHub release with an auto-generated changelog.
 
-Tags follow `vX.Y.Z` convention. Create and push separately: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+Do not bump these files or create tags manually — the workflow is the only supported release path.
 
 ## Devcontainer / ~/.claude mounts
 

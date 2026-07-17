@@ -50,4 +50,6 @@ Configuration lives in `pyproject.toml` (`[tool.black]`, `[tool.isort]`) and `se
 
 ## CI
 
-The GitHub Actions workflow (`.github/workflows/tests.yml`) runs on every push and on PRs targeting `main`. It runs tests, then all four lint checks in sequence. All steps must pass before a PR can be merged.
+The Forgejo Actions workflow (`.forgejo/workflows/ci.yml`) runs on every push and on PRs targeting `main`. It runs tests, then all four lint checks in sequence. All steps must pass before a PR can be merged.
+
+Dependency updates are managed by Renovate (`renovate.json`, `.forgejo/workflows/renovate.yml`) rather than Dependabot.

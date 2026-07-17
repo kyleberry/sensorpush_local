@@ -1,0 +1,30 @@
+name: Renovate
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # Monday at 03:00
+  workflow_dispatch:
+  # Dependency dashboard checkbox interactions and PR comment commands.
+  issues:
+    types: [edited]
+  issue_comment:
+    types: [created]
+  # Update dashboard and process follow-on work when a PR is merged or closed.
+  pull_request:
+    types: [closed]
+
+jobs:
+  renovate:
+    name: Renovate
+    runs-on: debian-trixie
+    steps:
+      - name: Run Renovate
+        run: renovate
+        env:
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+          RENOVATE_PLATFORM: forgejo
+          RENOVATE_ENDPOINT: ${{ github.server_url }}
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          # Needed to look up GitHub Actions releases without hitting API rate limits.
+          GITHUB_COM_TOKEN: ${{ secrets.GITHUBCOM_TOKEN }}
+          LOG_LEVEL: info

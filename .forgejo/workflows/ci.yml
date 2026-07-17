@@ -1,4 +1,7 @@
-name: Python Tests
+name: CI
+
+# No `permissions:` block — Forgejo doesn't scope FORGEJO_TOKEN/GITHUB_TOKEN
+# via this field (GitHub-compat syntax only, a no-op here).
 
 on:
   push:
@@ -9,7 +12,7 @@ on:
 jobs:
   test:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
-    runs-on: ubuntu-latest
+    runs-on: debian-trixie
     container:
       image: python:3.13-bookworm
 
@@ -17,7 +20,13 @@ jobs:
       - name: Install System Dependencies
         run: |
           apt-get update
-          apt-get install -y build-essential libudev-dev bluez git
+          apt-get install -y build-essential libudev-dev bluez git curl ca-certificates gnupg
+          # act_runner executes JS-based actions (actions/checkout, etc.) by
+          # running `node` inside this job container. python:3.13-bookworm
+          # doesn't ship one, so install it explicitly — same NodeSource
+          # approach as the homelab act-runner image.
+          curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+          apt-get install -y --no-install-recommends nodejs
 
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
