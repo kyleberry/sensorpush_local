@@ -1,4 +1,4 @@
-FROM python:3.13-bookworm
+FROM python:3.14-bookworm
 
 # Install build tools and system dependencies
 RUN apt-get update && apt-get install -y \

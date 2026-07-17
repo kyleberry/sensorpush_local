@@ -36,7 +36,7 @@ jobs:
     needs: validate
     runs-on: debian-trixie
     container:
-      image: python:3.13-bookworm
+      image: python:3.14-bookworm
 
     steps:
       - name: Install System Dependencies

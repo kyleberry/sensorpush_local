@@ -3,10 +3,10 @@ name = "sensorpush_local"
 version = "1.0.3"
 description = "Local Bluetooth monitoring for SensorPush devices"
 readme = "README.md"
-requires-python = ">=3.13.2"
+requires-python = ">=3.14.6"
 dependencies = [
-    "homeassistant==2026.2.3",
-    "bleak-retry-connector==4.6.0",
+    "homeassistant==2026.7.2",
+    "bleak-retry-connector==4.6.1",
     # habluetooth is transitive (pulled in by bleak-retry-connector and
     # homeassistant) but pinned explicitly so it's a named package Renovate's
     # "home assistant ecosystem" group can --upgrade-package too. Without
@@ -14,7 +14,7 @@ dependencies = [
     # frozen at whatever's already locked, since neither declared dependency
     # forces a version new enough — it just satisfies their loose metadata
     # constraint without being runtime-compatible.
-    "habluetooth==6.1.0",
+    "habluetooth==6.26.5",
     # aiousbwatcher and pyserial are not used directly by this integration
     # but are hard-imported by homeassistant.components.usb (pulled in via
     # the bluetooth stack). HA's wheel does not declare them in install_requires
@@ -29,14 +29,14 @@ dependencies = [
     # group (see renovate.json) doesn't hit a fresh ModuleNotFoundError the
     # next time homeassistant bumps far enough to need them.
     "serialx==1.8.2",
-    "aioesphomeapi==40.0.0",
+    "aioesphomeapi==45.6.0",
 ]
 
 [project.optional-dependencies]
 test = [
-    "pytest-homeassistant-custom-component==0.13.316",
-    "pytest-asyncio==1.3.0",
-    "pytest-cov==7.0.0",
+    "pytest-homeassistant-custom-component==0.13.346",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
     "argcomplete==3.7.0",
     "black==26.5.1",
     "flake8==7.3.0",
