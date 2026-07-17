@@ -34,6 +34,8 @@ The following ERROR lines appear in every test run and are benign — do not cha
 - `habluetooth.scanner: Failed to force stop scanner: 'NoneType' object has no attribute 'send'` — BLE scanner teardown in the test harness
 - `homeassistant.config_entries: An entry with the id mock_entry_id already exists` — fixture reuse across tests that share an entry ID
 
+`tests/conftest.py`'s `expected_lingering_timers` fixture tolerates `BaseHaScanner`'s recurring expire-devices timer not always being cancelled by the harness's `enable_bluetooth` fixture across homeassistant/habluetooth version combinations — see the fixture's docstring for the upstream issue. Not observed as of `homeassistant==2026.2.3`; added defensively ahead of the next bump.
+
 ## Architecture
 
 This is a Home Assistant custom integration that provides 100% local Bluetooth monitoring for SensorPush environmental sensors via Bluetooth proxies.

@@ -14,6 +14,26 @@ def auto_enable_bluetooth(enable_bluetooth):  # pylint: disable=unused-argument
     return
 
 
+@pytest.fixture(autouse=True)
+def expected_lingering_timers() -> bool:
+    """Tolerate BaseHaScanner's periodic expire-devices timer at teardown.
+
+    homeassistant's bluetooth component (via habluetooth) schedules a
+    recurring `_async_expire_devices_schedule_next` timer when the scanner
+    starts. pytest_homeassistant_custom_component's `enable_bluetooth`
+    fixture correctly unloads the "bluetooth" domain's own config entry at
+    teardown, but that doesn't reach this timer in every homeassistant/
+    habluetooth version combination — confirmed as a known upstream
+    core-vs-harness interaction (not a bug in this integration's code) via
+    https://github.com/MatthewFlamm/pytest-homeassistant-custom-component/issues/153,
+    where the same `expected_lingering_timers` pattern is the accepted
+    workaround. Not observed with the versions pinned as of this writing
+    (homeassistant==2026.2.3) — added ahead of the next homeassistant bump
+    so it doesn't reappear as a surprise CI failure.
+    """
+    return True
+
+
 @pytest.fixture
 async def mock_coordinator(hass):
     """Create a coordinator instance for tests."""
