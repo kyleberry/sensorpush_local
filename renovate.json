@@ -32,7 +32,8 @@
         "pytest-asyncio",
         "pytest-cov"
       ],
-      "automerge": false
+      "automerge": false,
+      "rangeStrategy": "bump"
     }
   ],
   "assignees": ["kyleberry"]
