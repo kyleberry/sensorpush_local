@@ -6,22 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Full pre-push check (tests + all linters)
-pytest tests/ && black --check --target-version py313 custom_components/ tests/ && isort --check-only custom_components/ tests/ && flake8 custom_components/ tests/ && pylint custom_components/ tests/
+uv run pytest tests/ && uv run black --check --target-version py313 custom_components/ tests/ && uv run isort --check-only custom_components/ tests/ && uv run flake8 custom_components/ tests/ && uv run pylint custom_components/ tests/
 
 # Install with test dependencies
-pip install -e .[test] --config-settings editable_mode=compat
+uv sync --extra test
 
 # Run all tests
-pytest tests/
+uv run pytest tests/
 
 # Run a single test file
-pytest tests/test_init.py
+uv run pytest tests/test_init.py
 
 # Run a single test
-pytest tests/test_init.py::test_function_name
+uv run pytest tests/test_init.py::test_function_name
 
 # Run with coverage (shows missing lines)
-pytest tests/ --cov=custom_components/sensorpush_local --cov-report=term-missing
+uv run pytest tests/ --cov=custom_components/sensorpush_local --cov-report=term-missing
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full contributor workflow.
@@ -79,7 +79,13 @@ HA startup / 3am daily schedule / manual service call
 
 ### Dependencies note
 
-`aiousbwatcher` and `pyserial` in `pyproject.toml` are not used by this integration directly. They are hard-imported by `homeassistant.components.usb` (loaded transitively via the bluetooth stack) but are absent from HA's wheel `install_requires`. Without them declared explicitly, `pip install` in a clean environment (e.g. CI) fails with `ModuleNotFoundError`. Do not remove them.
+`aiousbwatcher` and `pyserial` in `pyproject.toml` are not used by this integration directly. They are hard-imported by `homeassistant.components.usb` (loaded transitively via the bluetooth stack) but are absent from HA's wheel `install_requires`. Without them declared explicitly, dependency installation in a clean environment (e.g. CI) fails with `ModuleNotFoundError`. Do not remove them.
+
+### Dependency management (uv)
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/), pinned to exact versions in `pyproject.toml` and locked in `uv.lock` (committed — do not gitignore it). CI runs `uv sync --extra test --locked`, which fails the build if `uv.lock` is out of sync with `pyproject.toml` instead of silently regenerating it — always run `uv lock` after hand-editing a dependency version and commit the result.
+
+`uv.lock` embeds this project's own version number in a self-referencing entry, so `.forgejo/workflows/release.yml`'s release job runs `uv lock` again after bumping the version and includes it in the release commit — don't remove that step if you touch the release workflow.
 
 ### Test Files
 
@@ -100,17 +106,17 @@ HA startup / 3am daily schedule / manual service call
 ## Linting and formatting
 
 ```bash
-black custom_components/ tests/       # format
-isort custom_components/ tests/       # sort imports
-flake8 custom_components/ tests/      # style + unused imports
-pylint custom_components/ tests/      # static analysis (threshold: 9.5/10)
+uv run black custom_components/ tests/       # format
+uv run isort custom_components/ tests/       # sort imports
+uv run flake8 custom_components/ tests/      # style + unused imports
+uv run pylint custom_components/ tests/      # static analysis (threshold: 9.5/10)
 ```
 
 Config: `[tool.black]` and `[tool.isort]` in `pyproject.toml`; `[flake8]` and `[pylint.messages_control]` in `setup.cfg`. All four run in CI after tests.
 
 ## Version bumping
 
-Releases are automated via the `.forgejo/workflows/release.yml` workflow. Trigger it manually (`workflow_dispatch`) with a `version` input (e.g. `1.0.3`, no `v` prefix). It runs the full test/lint suite, then bumps the version in `custom_components/sensorpush_local/manifest.json`, `pyproject.toml`, and the README badge, commits, tags `vX.Y.Z`, waits for the push mirror to sync the tag to GitHub, and creates the GitHub release with an auto-generated changelog.
+Releases are automated via the `.forgejo/workflows/release.yml` workflow. Trigger it manually (`workflow_dispatch`) with a `version` input (e.g. `1.0.3`, no `v` prefix). It runs the full test/lint suite, then bumps the version in `custom_components/sensorpush_local/manifest.json`, `pyproject.toml`, and the README badge, refreshes `uv.lock`'s self-version entry, commits, tags `vX.Y.Z`, creates a release on this Forgejo instance, waits for the push mirror to sync the tag to GitHub, and creates the GitHub release with an auto-generated changelog.
 
 Do not bump these files or create tags manually — the workflow is the only supported release path.
 

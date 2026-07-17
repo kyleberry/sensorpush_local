@@ -31,21 +31,22 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - name: Cache Python dependencies
-        id: venv_cache
+      - name: Install uv
+        run: pip install uv
+
+      - name: Cache uv downloads
+        id: uv_cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .venv
-          key: test-venv-${{ hashFiles('pyproject.toml') }}
+          path: ~/.cache/uv
+          key: uv-${{ hashFiles('uv.lock') }}
           restore-keys: |
-            test-venv-
+            uv-
 
-      - name: Install Python Dependencies
-        if: steps.venv_cache.outputs.cache-hit != 'true'
-        run: |
-          python -m venv .venv
-          .venv/bin/pip install --upgrade pip setuptools wheel
-          .venv/bin/pip install -e .[test] --config-settings editable_mode=compat
+      # --locked fails the build if uv.lock is out of sync with pyproject.toml
+      # instead of silently regenerating it.
+      - name: Sync dependencies
+        run: uv sync --extra test --locked
 
       - name: Add venv to PATH
         run: echo "$(pwd)/.venv/bin" >> "$GITHUB_PATH"
