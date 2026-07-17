@@ -31,10 +31,24 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Cache Python dependencies
+        id: venv_cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .venv
+          key: test-venv-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            test-venv-
+
       - name: Install Python Dependencies
+        if: steps.venv_cache.outputs.cache-hit != 'true'
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -e .[test] --config-settings editable_mode=compat
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip setuptools wheel
+          .venv/bin/pip install -e .[test] --config-settings editable_mode=compat
+
+      - name: Add venv to PATH
+        run: echo "$(pwd)/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run Tests
         run: |

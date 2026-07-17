@@ -4,9 +4,10 @@ name: Release
 #
 # Requires this repo's Actions "Workflow permissions" to be set to
 # "Read and write" (repo Settings > Actions > General) so the default
-# checkout token can push the version-bump commit and tag back to main.
-# GH_RELEASE_TOKEN is only used for the two GitHub API calls below —
-# it never touches the Forgejo git push.
+# token can push the version-bump commit and tag back to main, and
+# create the Forgejo release via the local API.
+# GH_RELEASE_TOKEN is only used for the two GitHub API calls (poll +
+# create release) — it never touches Forgejo.
 
 on:
   workflow_dispatch:
@@ -52,10 +53,24 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      - name: Cache Python dependencies
+        id: venv_cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .venv
+          key: test-venv-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            test-venv-
+
       - name: Install Python Dependencies
+        if: steps.venv_cache.outputs.cache-hit != 'true'
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -e .[test] --config-settings editable_mode=compat
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip setuptools wheel
+          .venv/bin/pip install -e .[test] --config-settings editable_mode=compat
+
+      - name: Add venv to PATH
+        run: echo "$(pwd)/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run Tests
         run: |
@@ -112,6 +127,51 @@ jobs:
           git tag -a "v$VERSION" -m "Release v$VERSION"
           git push origin "v$VERSION"
 
+      - name: Generate changelog
+        id: changelog
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || echo "")
+          if [ -n "$PREVIOUS_TAG" ]; then
+            LOG=$(git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG..v$VERSION")
+          else
+            LOG=$(git log --pretty=format:"- %s (%h)" "v$VERSION")
+          fi
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            echo "$LOG"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create Forgejo release
+        env:
+          VERSION: ${{ inputs.version }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
+          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_RELEASES_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases
+        run: |
+          jq -n \
+            --arg tag "v$VERSION" \
+            --arg name "v$VERSION" \
+            --arg body "$CHANGELOG" \
+            '{tag_name: $tag, name: $name, body: $body}' > /tmp/forgejo_release_payload.json
+
+          http_status=$(curl -s -o /tmp/forgejo_release_response.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: token $FORGEJO_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$FORGEJO_RELEASES_URL" \
+            -d @/tmp/forgejo_release_payload.json)
+
+          if [ "$http_status" != "201" ]; then
+            echo "::error::Forgejo release creation failed with status $http_status"
+            cat /tmp/forgejo_release_response.json
+            exit 1
+          fi
+
+          echo "Forgejo release created: $(jq -r '.html_url' /tmp/forgejo_release_response.json)"
+
       - name: Wait for push mirror to sync tag to GitHub
         env:
           VERSION: ${{ inputs.version }}
@@ -130,23 +190,6 @@ jobs:
           done
           echo "::error::Tag v$VERSION never appeared on GitHub after 60s — check the push mirror config in repo settings"
           exit 1
-
-      - name: Generate changelog
-        id: changelog
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || echo "")
-          if [ -n "$PREVIOUS_TAG" ]; then
-            LOG=$(git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG..v$VERSION")
-          else
-            LOG=$(git log --pretty=format:"- %s (%h)" "v$VERSION")
-          fi
-          {
-            echo "changelog<<CHANGELOG_EOF"
-            echo "$LOG"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
         env:

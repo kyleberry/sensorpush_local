@@ -12,11 +12,19 @@
       "matchManagers": ["github-actions"]
     },
     {
+      "groupName": "python version",
+      "matchPackageNames": ["python"]
+    },
+    {
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
     },
     {
       "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "matchPackageNames": ["homeassistant", "bleak-retry-connector"],
       "automerge": false
     }
   ],
