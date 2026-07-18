@@ -2442,7 +2442,7 @@ wheels = [
 
 [[package]]
 name = "sensorpush-local"
-version = "1.0.3"
+version = "1.0.4"
 source = { virtual = "." }
 dependencies = [
     { name = "aioesphomeapi" },
