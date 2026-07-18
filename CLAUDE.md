@@ -120,7 +120,12 @@ Config: `[tool.black]` and `[tool.isort]` in `pyproject.toml`; `[flake8]` and `[
 
 ## Version bumping
 
-Releases are automated via the `.forgejo/workflows/release.yml` workflow. Trigger it manually (`workflow_dispatch`) with a `version` input (e.g. `1.0.3`, no `v` prefix). It runs the full test/lint suite, then bumps the version in `custom_components/sensorpush_local/manifest.json`, `pyproject.toml`, and the README badge, refreshes `uv.lock`'s self-version entry, commits, tags `vX.Y.Z`, creates a release on this Forgejo instance, waits for the push mirror to sync the tag to GitHub, and creates the GitHub release with an auto-generated changelog.
+Releases are automated via the `.forgejo/workflows/release.yml` workflow, split across two triggers because `main` is a protected branch and Forgejo Actions cannot push to a protected branch directly (open upstream bug: [forgejo#11159](https://codeberg.org/forgejo/forgejo/issues/11159) — the pre-receive hook crashes trying to resolve the synthetic Actions user). Trigger it manually (`workflow_dispatch`) with a `version` input (e.g. `1.0.3`, no `v` prefix):
+
+1. **`prepare-release`** runs the full test/lint suite, bumps the version in `manifest.json`, `pyproject.toml`, and the README badge, refreshes `uv.lock`'s self-version entry, commits to a new `release/vX.Y.Z` branch (not `main` — unaffected by the bug), opens a PR, and schedules auto-merge.
+2. **`finalize-release`** triggers on that PR's merge (`pull_request: types: [closed]`, filtered to merged PRs on a `release/*` branch), tags `vX.Y.Z` (tag pushes aren't covered by branch protection, so unaffected by the bug), creates a release on this Forgejo instance, waits for the push mirror to sync the tag to GitHub, and creates the GitHub release with an auto-generated changelog.
+
+Do not bump these files or create tags manually — the workflow is the only supported release path. If auto-merge doesn't fire (e.g. the required status check config changes), merge the `release/vX.Y.Z` PR manually — `finalize-release` still triggers on any merge of a matching branch, however it happened.
 
 Do not bump these files or create tags manually — the workflow is the only supported release path.
 

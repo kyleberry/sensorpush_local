@@ -4,10 +4,25 @@ name: Release
 #
 # Requires this repo's Actions "Workflow permissions" to be set to
 # "Read and write" (repo Settings > Actions > General) so the default
-# token can push the version-bump commit and tag back to main, and
-# create the Forgejo release via the local API.
+# token can push the version-bump commit to a release/* branch, open
+# and auto-merge the release PR, and create the Forgejo release.
 # GH_RELEASE_TOKEN is only used for the two GitHub API calls (poll +
 # create release) — it never touches Forgejo.
+#
+# Split into two triggers instead of one straight-through job because
+# Forgejo has an open bug (codeberg.org/forgejo/forgejo/issues/11159):
+# a direct push to a protected branch from Forgejo Actions crashes the
+# pre-receive hook trying to resolve the Actions system user, which
+# has no real database row. Pushing a version-bump commit straight to
+# `main` (protected, required status checks) hits this unconditionally.
+# Tag pushes are unaffected — branch protection doesn't cover tag refs.
+#
+# So: workflow_dispatch bumps the version on a release/vX.Y.Z branch,
+# opens a PR, and schedules auto-merge — none of that touches `main`
+# directly. Once that PR actually merges (a normal PR merge, not a raw
+# Actions push, so it isn't hit by the bug), the pull_request:closed
+# trigger below picks up and does the tag + release creation, which
+# only ever needed non-protected refs anyway.
 
 on:
   workflow_dispatch:
@@ -16,10 +31,13 @@ on:
         description: 'Version to release (e.g. 1.0.3, no v prefix)'
         required: true
         type: string
+  pull_request:
+    types: [closed]
 
 jobs:
   validate:
     name: Validate version input
+    if: github.event_name == 'workflow_dispatch'
     runs-on: debian-trixie
     steps:
       - name: Check version format
@@ -33,6 +51,7 @@ jobs:
 
   test:
     name: Test
+    if: github.event_name == 'workflow_dispatch'
     needs: validate
     runs-on: debian-trixie
     container:
@@ -93,8 +112,9 @@ jobs:
         run: |
           pylint custom_components/ tests/ --fail-under=9.5
 
-  release:
-    name: Release
+  prepare-release:
+    name: Prepare release PR
+    if: github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: debian-trixie
     steps:
@@ -126,27 +146,102 @@ jobs:
       - name: Refresh uv.lock for the new version
         run: uv lock
 
-      - name: Commit version bump
+      - name: Commit version bump to a release branch
         env:
           VERSION: ${{ inputs.version }}
         run: |
           git config user.name "forgejo-actions"
           git config user.email "actions@git.berry.house"
+          git checkout -b "release/v$VERSION"
           git add custom_components/sensorpush_local/manifest.json pyproject.toml README.md uv.lock
           git commit -m "Release v$VERSION"
-          git push origin HEAD:main
+          git push origin "release/v$VERSION"
+
+      - name: Create release PR
+        id: create_pr
+        env:
+          VERSION: ${{ inputs.version }}
+          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+        run: |
+          jq -n \
+            --arg head "release/v$VERSION" \
+            --arg base "main" \
+            --arg title "Release v$VERSION" \
+            --arg body "Automated version bump for v$VERSION. Auto-merges once CI passes; tagging and release creation happen after merge." \
+            '{head: $head, base: $base, title: $title, body: $body}' > /tmp/pr_payload.json
+
+          http_status=$(curl -s -o /tmp/pr_response.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: token $FORGEJO_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$FORGEJO_API_URL/pulls" \
+            -d @/tmp/pr_payload.json)
+
+          if [ "$http_status" != "201" ]; then
+            echo "::error::Release PR creation failed with status $http_status"
+            cat /tmp/pr_response.json
+            exit 1
+          fi
+
+          pr_number=$(jq -r '.number' /tmp/pr_response.json)
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "Release PR created: $(jq -r '.html_url' /tmp/pr_response.json)"
+
+      - name: Enable auto-merge
+        env:
+          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          PR_NUMBER: ${{ steps.create_pr.outputs.pr_number }}
+        run: |
+          jq -n '{Do: "merge", merge_when_checks_succeed: true, delete_branch_after_merge: true}' \
+            > /tmp/automerge_payload.json
+
+          http_status=$(curl -s -o /tmp/automerge_response.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: token $FORGEJO_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$FORGEJO_API_URL/pulls/$PR_NUMBER/merge" \
+            -d @/tmp/automerge_payload.json)
+
+          if [ "$http_status" != "200" ] && [ "$http_status" != "201" ]; then
+            echo "::error::Enabling auto-merge failed with status $http_status"
+            cat /tmp/automerge_response.json
+            exit 1
+          fi
+
+          echo "Auto-merge scheduled for PR #$PR_NUMBER"
+
+  finalize-release:
+    name: Finalize release
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+    runs-on: debian-trixie
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Read version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Tag release
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
+          git config user.name "forgejo-actions"
+          git config user.email "actions@git.berry.house"
           git tag -a "v$VERSION" -m "Release v$VERSION"
           git push origin "v$VERSION"
 
       - name: Generate changelog
         id: changelog
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || echo "")
           if [ -n "$PREVIOUS_TAG" ]; then
@@ -162,7 +257,7 @@ jobs:
 
       - name: Create Forgejo release
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
           CHANGELOG: ${{ steps.changelog.outputs.changelog }}
           FORGEJO_TOKEN: ${{ github.token }}
           FORGEJO_RELEASES_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases
@@ -190,7 +285,7 @@ jobs:
 
       - name: Wait for push mirror to sync tag to GitHub
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
         run: |
           for i in $(seq 1 12); do
@@ -209,7 +304,7 @@ jobs:
 
       - name: Create GitHub release
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
           CHANGELOG: ${{ steps.changelog.outputs.changelog }}
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
         run: |
