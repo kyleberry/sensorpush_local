@@ -4,8 +4,7 @@ name: Release
 #
 # Requires this repo's Actions "Workflow permissions" to be set to
 # "Read and write" (repo Settings > Actions > General) so the default
-# token can push the version-bump commit to a release/* branch, open
-# and auto-merge the release PR, and create the Forgejo release.
+# token can create the Forgejo release in finalize-release.
 # GH_RELEASE_TOKEN is only used for the two GitHub API calls (poll +
 # create release) — it never touches Forgejo.
 #
@@ -23,6 +22,20 @@ name: Release
 # Actions push, so it isn't hit by the bug), the pull_request:closed
 # trigger below picks up and does the tag + release creation, which
 # only ever needed non-protected refs anyway.
+#
+# prepare-release's branch push and PR creation use FORGEJORELEASE_TOKEN
+# (a real user's PAT, not the default token) for a second reason beyond
+# the branch-protection bug: Forgejo (like GitHub) never triggers new
+# workflow runs as a side effect of a push or PR made with the default
+# Actions token, specifically to prevent infinite recursion. Using the
+# default token here would mean ci.yml's required status check never
+# runs on the release branch, and auto-merge waits forever on a check
+# that was never triggered. FORGEJORELEASE_TOKEN must be a Forgejo
+# Personal Access Token from a real account (repo write scope) added
+# as a repo secret — not something this workflow can generate itself.
+# Named without the FORGEJO_ prefix because Forgejo reserves that
+# prefix for its own secret names (same restriction GitHub applies to
+# GITHUB_-prefixed secrets).
 
 on:
   workflow_dispatch:
@@ -122,6 +135,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
+          token: ${{ secrets.FORGEJORELEASE_TOKEN }}
 
       - name: Bump version in manifest.json, pyproject.toml, README.md
         env:
@@ -161,7 +175,7 @@ jobs:
         id: create_pr
         env:
           VERSION: ${{ inputs.version }}
-          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJORELEASE_TOKEN }}
           FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
         run: |
           jq -n \
@@ -190,7 +204,7 @@ jobs:
 
       - name: Enable auto-merge
         env:
-          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJORELEASE_TOKEN }}
           FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
           PR_NUMBER: ${{ steps.create_pr.outputs.pr_number }}
         run: |
