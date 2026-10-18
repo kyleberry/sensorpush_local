@@ -16,7 +16,16 @@
     "source=${localEnv:HOME}/.claude/projects,target=/root/.claude/projects,type=bind,consistency=cached"
   ],
   "remoteUser": "root",
-  "postCreateCommand": "chsh -s $(which zsh) && uv sync --extra test && uv run activate-global-python-argcomplete",
+  // Resolve *.berry.house through AdGuard like the host does, so
+  // mcp.berry.house reaches Caddy on the LAN. Docker's default resolvers
+  // return the public Cloudflare address, which needs Cloudflare Access
+  // headers the berry-mcp plugin doesn't send. 1.1.1.1 is the fallback
+  // when AdGuard isn't reachable (off the LAN without WireGuard).
+  "runArgs": ["--dns=192.168.86.2", "--dns=1.1.1.1"],
+  "containerEnv": {
+    "MCP_BEARER_TOKEN": "${localEnv:MCP_BEARER_TOKEN}"
+  },
+  "postCreateCommand": ".devcontainer/post-create.sh",
   "customizations": {
     "vscode": {
       "settings": {
