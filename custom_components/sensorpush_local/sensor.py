@@ -8,49 +8,72 @@ from homeassistant.components.sensor import (
 from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import EVENT_DEVICE_REGISTRY_UPDATED
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MANUFACTURER
+from .const import DOMAIN, SENSORPUSH_DOMAIN
+from .devices import async_get_source_devices, mac_from_identifiers
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _unique_id(mac: str) -> str:
+    return f"sp_{mac.replace(':', '').lower()}_volt_native"
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up SensorPush entities from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    dev_reg = dr.async_get(hass)
     ent_reg = async_get_entity_registry(hass)
-    entities = []
 
-    for device in [
-        d for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER
-    ]:
-        mac = next(
-            (i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None
+    async_add_entities(
+        [
+            SensorPushVoltageSensor(coordinator, device, mac)
+            for device, mac in async_get_source_devices(hass)
+        ]
+    )
+
+    @callback
+    def _handle_device_added(device_id):
+        # (device, None) when the device isn't owned by a sensorpush entry
+        device, sp_entry = dr.async_get_device_and_config_entry_for_domain(
+            hass, device_id, domain=SENSORPUSH_DOMAIN, include_child_devices=False
         )
-        if mac:
-            entities.append(SensorPushVoltageSensor(coordinator, device, mac))
+        if device is None or sp_entry is None:
+            return
+        mac = mac_from_identifiers(device.identifiers)
+        if not mac:
+            return
+        if ent_reg.async_get_entity_id("sensor", DOMAIN, _unique_id(mac)):
+            return
+        async_add_entities([SensorPushVoltageSensor(coordinator, device, mac)])
 
-    async_add_entities(entities)
+    @callback
+    def _handle_device_removed(device_dict):
+        mac = mac_from_identifiers(tuple(i) for i in device_dict.get("identifiers", ()))
+        if not mac:
+            return
+        # Only drop our entity once no core SensorPush device has this MAC
+        if any(m == mac for _d, m in async_get_source_devices(hass)):
+            return
+        # Defer: HA is still dispatching the entity registry update that
+        # detaches our entity from the removed device, and removing the entity
+        # mid-dispatch makes that update fail.
+        hass.loop.call_soon(_remove_entity, mac)
+
+    @callback
+    def _remove_entity(mac):
+        if entity_id := ent_reg.async_get_entity_id("sensor", DOMAIN, _unique_id(mac)):
+            _LOGGER.info("SensorPush device %s removed; removing %s", mac, entity_id)
+            ent_reg.async_remove(entity_id)
 
     @callback
     def _handle_device_registry_update(event):
-        if event.data.get("action") != "create":
-            return
-        device = dev_reg.async_get(event.data["device_id"])
-        if not device or device.manufacturer != MANUFACTURER:
-            return
-        mac = next(
-            (i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None
-        )
-        if not mac:
-            return
-        uid = f"sp_{mac.replace(':', '').lower()}_volt_native"
-        if ent_reg.async_get_entity_id("sensor", DOMAIN, uid):
-            return
-        async_add_entities([SensorPushVoltageSensor(coordinator, device, mac)])
+        action = event.data.get("action")
+        if action == "create":
+            _handle_device_added(event.data["device_id"])
+        elif action == "remove":
+            _handle_device_removed(event.data.get("device") or {})
 
     entry.async_on_unload(
         hass.bus.async_listen(
@@ -73,8 +96,11 @@ class SensorPushVoltageSensor(CoordinatorEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._mac = mac
-        self._attr_unique_id = f"sp_{mac.replace(':', '').lower()}_volt_native"
-        self._attr_device_info = DeviceInfo(identifiers=device.identifiers)
+        self._attr_unique_id = _unique_id(mac)
+        # Link to the core sensorpush device instead of declaring DeviceInfo.
+        # Since HA 2026.8, DeviceInfo always creates a device owned by *this*
+        # config entry, which shows up as a duplicate of the sensor.
+        self.device_entry = device
 
     @property
     def native_value(self):

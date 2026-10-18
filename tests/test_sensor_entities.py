@@ -4,11 +4,13 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.sensorpush_local.const import DOMAIN, MANUFACTURER
+from custom_components.sensorpush_local.const import DOMAIN
 from custom_components.sensorpush_local.sensor import (
     SensorPushVoltageSensor,
     async_setup_entry,
 )
+
+from .const import MANUFACTURER
 
 
 @pytest.mark.asyncio
@@ -87,7 +89,9 @@ async def test_sensor_state_reporting(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
-async def test_sensor_async_setup_entry_creates_entities(hass, mock_coordinator):
+async def test_sensor_async_setup_entry_creates_entities(
+    hass, mock_coordinator, sp_entry
+):
     """Test that async_setup_entry creates one entity per registered SensorPush device."""
     entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
     entry.add_to_hass(hass)
@@ -98,13 +102,13 @@ async def test_sensor_async_setup_entry_creates_entities(hass, mock_coordinator)
     # Register two SensorPush devices in the device registry
     dev_reg = dr.async_get(hass)
     dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
+        config_entry_id=sp_entry.entry_id,
         identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
         manufacturer=MANUFACTURER,
         name="Sensor One",
     )
     dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
+        config_entry_id=sp_entry.entry_id,
         identifiers={("bluetooth", "11:22:33:44:55:66")},
         manufacturer=MANUFACTURER,
         name="Sensor Two",
@@ -120,7 +124,7 @@ async def test_sensor_async_setup_entry_creates_entities(hass, mock_coordinator)
 
 
 @pytest.mark.asyncio
-async def test_new_device_auto_creates_entity(hass, mock_coordinator):
+async def test_new_device_auto_creates_entity(hass, mock_coordinator, sp_entry):
     """Test that a SensorPush device added after setup automatically gets an entity."""
     entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
     entry.add_to_hass(hass)
@@ -133,7 +137,7 @@ async def test_new_device_auto_creates_entity(hass, mock_coordinator):
 
     # Simulate a new SensorPush device appearing (e.g. paired via the official app)
     dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
+        config_entry_id=sp_entry.entry_id,
         identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
         manufacturer=MANUFACTURER,
         name="New Bedroom Sensor",
@@ -146,7 +150,7 @@ async def test_new_device_auto_creates_entity(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
-async def test_new_device_no_duplicate_entity(hass, mock_coordinator):
+async def test_new_device_no_duplicate_entity(hass, mock_coordinator, sp_entry):
     """Test that a device whose entity already exists in the registry doesn't get a second entity."""
     entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
     entry.add_to_hass(hass)
@@ -154,7 +158,7 @@ async def test_new_device_no_duplicate_entity(hass, mock_coordinator):
 
     dev_reg = dr.async_get(hass)
     device = dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
+        config_entry_id=sp_entry.entry_id,
         identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
         manufacturer=MANUFACTURER,
         name="Existing Sensor",
@@ -204,7 +208,7 @@ async def test_device_registry_listener_ignores_non_create_events(
 async def test_device_registry_listener_ignores_non_sensorpush_devices(
     hass, mock_coordinator
 ):
-    """Test that a newly created device from a different manufacturer is ignored."""
+    """Test that a new device not owned by the sensorpush integration is ignored."""
     entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
     entry.add_to_hass(hass)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = mock_coordinator
@@ -213,8 +217,10 @@ async def test_device_registry_listener_ignores_non_sensorpush_devices(
     added = []
     await async_setup_entry(hass, entry, added.extend)
 
+    other_entry = MockConfigEntry(domain="govee_ble", data={})
+    other_entry.add_to_hass(hass)
     dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
+        config_entry_id=other_entry.entry_id,
         identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
         manufacturer="Govee",
         name="Not a SensorPush",
@@ -226,7 +232,7 @@ async def test_device_registry_listener_ignores_non_sensorpush_devices(
 
 @pytest.mark.asyncio
 async def test_device_registry_listener_ignores_device_without_bluetooth_identifier(
-    hass, mock_coordinator
+    hass, mock_coordinator, sp_entry
 ):
     """Test that a new SensorPush device without a bluetooth identifier is skipped."""
     entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
@@ -239,7 +245,7 @@ async def test_device_registry_listener_ignores_device_without_bluetooth_identif
 
     # SensorPush device but identified by something other than bluetooth
     dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
+        config_entry_id=sp_entry.entry_id,
         identifiers={("sensorpush", "12345")},
         manufacturer=MANUFACTURER,
         name="No BT Identifier",

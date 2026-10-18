@@ -34,7 +34,7 @@ The following ERROR lines appear in every test run and are benign — do not cha
 - `habluetooth.scanner: Failed to force stop scanner: 'NoneType' object has no attribute 'send'` — BLE scanner teardown in the test harness
 - `homeassistant.config_entries: An entry with the id mock_entry_id already exists` — fixture reuse across tests that share an entry ID
 
-`tests/conftest.py`'s `expected_lingering_timers` fixture tolerates `BaseHaScanner`'s recurring expire-devices timer not always being cancelled by the harness's `enable_bluetooth` fixture across homeassistant/habluetooth version combinations — see the fixture's docstring for the upstream issue. Not observed as of `homeassistant==2026.2.3`; added defensively ahead of the next bump.
+`tests/conftest.py`'s `expected_lingering_timers` fixture tolerates `BaseHaScanner`'s recurring expire-devices timer not always being cancelled by the harness's `enable_bluetooth` fixture across homeassistant/habluetooth version combinations — see the fixture's docstring for the upstream issue. Not observed as of `homeassistant==2026.10.2`; kept defensively.
 
 ## Architecture
 
@@ -43,7 +43,8 @@ This is a Home Assistant custom integration that provides 100% local Bluetooth m
 ### Core Components
 
 **`custom_components/sensorpush_local/__init__.py`** — `SensorPushCoordinator` (extends `DataUpdateCoordinator`) is the heart of the integration. It:
-- Discovers registered SensorPush devices dynamically from the HA device registry
+- Discovers SensorPush devices dynamically: every device owned by a config entry of the core `sensorpush` integration (`devices.async_get_source_devices`), not by manufacturer name
+- On setup, calls `devices.async_remove_duplicate_devices` before forwarding the sensor platform — see **Device ownership** below
 - Performs GATT audits on a fixed daily schedule at a configurable hour (default 3:00am local time), registered via `async_track_time_change` (`update_interval` is `None`). The hour is read from `entry.options.get(CONF_DAILY_AUDIT_HOUR, DEFAULT_DAILY_AUDIT_HOUR)`. The `_handle_daily_audit` callback is decorated with `@callback` — this is required for `hass.async_create_task` to be callable from within it; omitting it causes HA's thread-safety checker to raise a `RuntimeError` and silently drop the task. The unsub callback is stored on `coordinator._unsub_daily_audit` and called during unload.
 - Schedules the initial audit as a background task on setup (not blocking — `async_config_entry_first_refresh` is intentionally not used; GATT connections take 10–45s per device and would exceed HA's stage 2 bootstrap timeout). The 3am recurring schedule is separate from this and fires independently each day.
 - Exposes a `sensorpush_local.run_audit` service to trigger manual audits
@@ -56,7 +57,15 @@ RSSI is obtained from `bluetooth.async_last_service_info(hass, mac)` before conn
 
 **`custom_components/sensorpush_local/sensor.py`** — `SensorPushVoltageSensor` pulls from coordinator cache keyed by MAC address. The entity is named "Battery Voltage" and defaults to 2 decimal places via `_attr_suggested_display_precision`. Extra state attributes include `rssi_at_read`, `proxy_source`, `raw_value`, `temp_at_read` (raw `uint16` from device — units are device-dependent, not calibrated °C), `last_audit`, and `model_type`.
 
-`async_setup_entry` registers a `EVENT_DEVICE_REGISTRY_UPDATED` listener via `entry.async_on_unload` so that new SensorPush devices added after setup automatically get an entity without requiring an integration reload. Deduplication is handled by checking HA's entity registry (`async_get_entity_id`) rather than an in-memory set — this correctly handles device removal and re-addition without requiring an integration reload.
+`async_setup_entry` registers a `EVENT_DEVICE_REGISTRY_UPDATED` listener via `entry.async_on_unload`. On `create` of a device owned by a `sensorpush` entry, it adds an entity without requiring an integration reload; deduplication is handled by checking HA's entity registry (`async_get_entity_id`) rather than an in-memory set. On `remove`, it deletes our entity once no core SensorPush device with that MAC remains — deferred with `hass.loop.call_soon`, because HA is still dispatching the entity registry update that detaches our entity, and removing it mid-dispatch makes that update raise.
+
+**`custom_components/sensorpush_local/devices.py`** — Device discovery (`async_get_source_devices`, `mac_from_identifiers`) and duplicate clean-up (`async_remove_duplicate_devices`).
+
+### Device ownership (HA 2026.8+)
+
+Since HA 2026.8 a device belongs to exactly one config entry; identifiers are only unique per config entry. The SensorPush devices are owned by the core `sensorpush` integration. This integration **must not own devices**:
+- `SensorPushVoltageSensor` links to the core device by setting `self.device_entry` in `__init__`. Do not set `_attr_device_info` — any `DeviceInfo` creates a separate device owned by this config entry, which shows up as a duplicate of the sensor.
+- HA's 2026.8 registry migration split every previously shared device into one copy per config entry, leaving each sensor duplicated. `async_remove_duplicate_devices` runs HA's `helper_integration.async_remove_helper_devices` once per core device to relink our entities and delete our copy, then removes any remaining device this entry owns (orphans whose core device is gone — their entities go with them).
 
 **`custom_components/sensorpush_local/config_flow.py`** — Single-instance only; no user input beyond clicking through. Exposes an `OptionsFlowHandler` with two configurable fields: `daily_audit_hour` (0–23, default 3) and `max_retries` (0–5, default 2), rendered as integer number boxes. Changing options triggers an entry reload via `entry.add_update_listener` → `_async_reload_entry`.
 
@@ -68,7 +77,7 @@ RSSI is obtained from `bluetooth.async_last_service_info(hass, mac)` before conn
 HA startup / 3am daily schedule / manual service call
   → SensorPushCoordinator._async_update_data()
     → early exit if lock is already held (preserves existing data)
-    → device_registry lookup (dynamic discovery)
+    → devices owned by core sensorpush config entries (dynamic discovery)
     → for each device: audit_device() acquires lock, performs GATT read, releases lock
       → RSSI and source from bluetooth.async_last_service_info (pre-connection)
       → source resolved to friendly name via bluetooth.async_scanner_by_source
@@ -85,7 +94,7 @@ HA startup / 3am daily schedule / manual service call
 
 ### Dependency management (uv)
 
-Dependencies are managed with [uv](https://docs.astral.sh/uv/), pinned to exact versions in `pyproject.toml` and locked in `uv.lock` (committed — do not gitignore it). CI runs `uv sync --extra test --locked`, which fails the build if `uv.lock` is out of sync with `pyproject.toml` instead of silently regenerating it — always run `uv lock` after hand-editing a dependency version and commit the result.
+Dependencies are managed with [uv](https://docs.astral.sh/uv/), pinned to exact versions in `pyproject.toml` and locked in `uv.lock` (committed — do not gitignore it). `[tool.uv] environments` limits the lock to Linux and Apple Silicon macOS: on Intel macOS, `aioesphomeapi` caps `cryptography` below what `homeassistant` pins, so the lock can't resolve there. `requires-python` is capped `<3.15` so uv doesn't pick a 3.15 pre-release (pyyaml fails to build under it). CI runs `uv sync --extra test --locked`, which fails the build if `uv.lock` is out of sync with `pyproject.toml` instead of silently regenerating it — always run `uv lock` after hand-editing a dependency version and commit the result.
 
 `uv.lock` embeds this project's own version number in a self-referencing entry, so `.forgejo/workflows/release.yml`'s release job runs `uv lock` again after bumping the version and includes it in the release commit — don't remove that step if you touch the release workflow.
 
@@ -97,6 +106,7 @@ Dependencies are managed with [uv](https://docs.astral.sh/uv/), pinned to exact 
 |------|---------------|
 | `tests/test_init.py` | Coordinator logic: service registration, unload, lock behaviour, background task scheduling, `_async_update_data`, `audit_device` error paths |
 | `tests/test_sensor_entities.py` | `SensorPushVoltageSensor` entity: state, attributes, availability, `async_setup_entry` entity creation |
+| `tests/test_devices.py` | Device ownership against the real registries: entity linked to the core device, duplicate/orphan clean-up on setup, entity removed with its core device |
 | `tests/test_config_flow.py` | Config flow: form display, entry creation, single-instance abort, options flow defaults and save |
 | `tests/test_diagnostics.py` | Diagnostics: default options output, custom options + live device data |
 | `tests/test_sensor.py` | `audit_device` happy paths: model detection, voltage math, RSSI/source from service_info, scanner name resolution, timeout/lock/malformed-payload error paths |
@@ -106,6 +116,7 @@ Dependencies are managed with [uv](https://docs.astral.sh/uv/), pinned to exact 
 `tests/conftest.py` provides:
 - `mock_coordinator` — coordinator instance with mocked Bluetooth and a no-op `async_refresh`
 - `auto_enable_bluetooth` — enables BLE for all tests (auto-used)
+- `sp_entry` — a core `sensorpush` config entry; register test SensorPush devices under it, not under the `sensorpush_local` entry
 
 ## Linting and formatting
 

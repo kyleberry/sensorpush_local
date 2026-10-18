@@ -7,7 +7,9 @@ from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sensorpush_local import async_setup_entry, async_unload_entry
-from custom_components.sensorpush_local.const import DOMAIN, MANUFACTURER
+from custom_components.sensorpush_local.const import DOMAIN
+
+from .const import MANUFACTURER
 
 
 @pytest.mark.asyncio
@@ -163,14 +165,16 @@ async def test_audit_device_general_exception(hass, mock_coordinator, caplog):
 
 
 @pytest.mark.asyncio
-async def test_update_data_stores_successful_audit_result(hass, mock_coordinator):
+async def test_update_data_stores_successful_audit_result(
+    hass, mock_coordinator, sp_entry
+):
     """Test that _async_update_data stores the result when audit_device succeeds."""
     dev_reg = dr.async_get(hass)
     mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_entry_id", data={})
     mock_entry.add_to_hass(hass)
 
     dev_reg.async_get_or_create(
-        config_entry_id=mock_entry.entry_id,
+        config_entry_id=sp_entry.entry_id,
         identifiers={("bluetooth", "AA:BB:CC:DD:EE:FF")},
         manufacturer=MANUFACTURER,
         name="Test Sensor",
@@ -240,7 +244,7 @@ async def test_setup_loads_persisted_data(hass, mock_coordinator):
 @pytest.mark.asyncio
 @pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_update_data_skips_device_without_bluetooth_identifier(
-    hass, mock_coordinator
+    hass, mock_coordinator, sp_entry
 ):
     """Test that devices lacking a bluetooth identifier are skipped silently."""
     dev_reg = dr.async_get(hass)
@@ -249,7 +253,7 @@ async def test_update_data_skips_device_without_bluetooth_identifier(
 
     # Register a SensorPush device with only a non-bluetooth identifier
     dev_reg.async_get_or_create(
-        config_entry_id=mock_entry.entry_id,
+        config_entry_id=sp_entry.entry_id,
         identifiers={("some_other_domain", "12345")},
         manufacturer=MANUFACTURER,
         name="Bluetooth-less Sensor",

@@ -3,10 +3,10 @@ name = "sensorpush_local"
 version = "1.0.4"
 description = "Local Bluetooth monitoring for SensorPush devices"
 readme = "README.md"
-requires-python = ">=3.14.6"
+requires-python = ">=3.14.6,<3.15"
 dependencies = [
-    "homeassistant==2026.7.2",
-    "bleak-retry-connector==4.6.1",
+    "homeassistant==2026.10.2",
+    "bleak-retry-connector==4.7.1",
     # habluetooth is transitive (pulled in by bleak-retry-connector and
     # homeassistant) but pinned explicitly so it's a named package Renovate's
     # "home assistant ecosystem" group can --upgrade-package too. Without
@@ -14,27 +14,24 @@ dependencies = [
     # frozen at whatever's already locked, since neither declared dependency
     # forces a version new enough — it just satisfies their loose metadata
     # constraint without being runtime-compatible.
-    "habluetooth==6.26.5",
+    "habluetooth==7.1.2",
     # aiousbwatcher and pyserial are not used directly by this integration
     # but are hard-imported by homeassistant.components.usb (pulled in via
     # the bluetooth stack). HA's wheel does not declare them in install_requires
     # so pip will not install them transitively. Do not remove these.
     "aiousbwatcher==1.1.2",
     "pyserial==3.5",
-    # serialx and aioesphomeapi: not needed by homeassistant==2026.2.3 (no
-    # reference in its usb component today), but a later HA release's usb
-    # component hard-imports serialx, which itself imports aioesphomeapi —
-    # same undeclared-transitive-dependency pattern as aiousbwatcher/pyserial
-    # above. Pre-declared now so the "home assistant ecosystem" Renovate
-    # group (see renovate.json) doesn't hit a fresh ModuleNotFoundError the
-    # next time homeassistant bumps far enough to need them.
-    "serialx==1.8.2",
-    "aioesphomeapi==45.6.0",
+    # serialx and aioesphomeapi: hard-imported by homeassistant.components.usb
+    # (serialx imports aioesphomeapi) — same undeclared-transitive-dependency
+    # pattern as aiousbwatcher/pyserial above. Keep these at the versions in
+    # HA's usb and esphome manifests for the pinned homeassistant release.
+    "serialx==1.11.0",
+    "aioesphomeapi==46.6.0",
 ]
 
 [project.optional-dependencies]
 test = [
-    "pytest-homeassistant-custom-component==0.13.346",
+    "pytest-homeassistant-custom-component==0.13.373",
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "argcomplete==3.7.0",
@@ -43,6 +40,15 @@ test = [
     "flake8-pyproject==1.2.4",
     "isort==8.0.1",
     "pylint==4.0.6",
+]
+
+[tool.uv]
+# Only lock for the platforms this project is developed and tested on. On Intel
+# macOS, aioesphomeapi caps cryptography below what homeassistant pins, so the
+# lock can't resolve there (HA doesn't target that platform anyway).
+environments = [
+    "sys_platform == 'linux'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 
 [tool.pytest.ini_options]

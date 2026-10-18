@@ -10,7 +10,6 @@ from bleak_retry_connector import (
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -24,8 +23,8 @@ from .const import (
     DEFAULT_DAILY_AUDIT_HOUR,
     DEFAULT_MAX_RETRIES,
     DOMAIN,
-    MANUFACTURER,
 )
+from .devices import async_get_source_devices, async_remove_duplicate_devices
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +40,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Seed coordinator with last-known values so entities are not "Unavailable"
     # immediately after a restart while the background audit is still running.
     await coordinator.async_load_persisted_data()
+
+    # Clean up duplicate devices left by HA 2026.8's device split before the
+    # sensor platform links entities to the core sensorpush devices.
+    async_remove_duplicate_devices(hass, entry)
 
     # Store the coordinator for the sensors to use
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -140,23 +143,14 @@ class SensorPushCoordinator(DataUpdateCoordinator):
             )
             return self.data
 
-        dev_reg = dr.async_get(self.hass)
         # Carry forward last-known data; only overwrite on successful audit
         new_data = dict(self.data or {})
 
-        # Find all devices from the 'SensorPush' manufacturer
-        sensor_devices = [
-            d for d in dev_reg.devices.values() if d.manufacturer == MANUFACTURER
-        ]
+        # Devices owned by the core sensorpush integration
+        sensor_devices = async_get_source_devices(self.hass)
 
         updated = 0
-        for device in sensor_devices:
-            mac = next(
-                (i[1].upper() for i in device.identifiers if i[0] == "bluetooth"), None
-            )
-            if not mac:
-                continue
-
+        for device, mac in sensor_devices:
             name = device.name_by_user or device.name or "Unknown Sensor"
 
             # Perform the GATT audit

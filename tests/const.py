@@ -1,6 +1,7 @@
 """Constants for SensorPush Local tests."""
 
 DOMAIN = "sensorpush_local"
+MANUFACTURER = "SensorPush"
 
 # GATT Characteristics
 CHAR_BATTERY = "ef090007-11d6-42ba-93b8-9DD7EC090AA9"

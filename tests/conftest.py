@@ -5,7 +5,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sensorpush_local import SensorPushCoordinator
-from custom_components.sensorpush_local.const import DOMAIN
+from custom_components.sensorpush_local.const import DOMAIN, SENSORPUSH_DOMAIN
 
 
 @pytest.fixture(autouse=True)
@@ -59,3 +59,11 @@ async def mock_coordinator(hass):
         coordinator._store.async_save = AsyncMock()
 
         return coordinator
+
+
+@pytest.fixture
+def sp_entry(hass):
+    """A config entry for the core sensorpush integration, which owns the devices."""
+    entry = MockConfigEntry(domain=SENSORPUSH_DOMAIN, entry_id="sp_entry_id", data={})
+    entry.add_to_hass(hass)
+    return entry
