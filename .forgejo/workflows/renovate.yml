@@ -2,7 +2,12 @@ name: Renovate
 
 on:
   schedule:
-    - cron: '0 3 * * 1'  # Monday at 03:00
+    # Forgejo evaluates cron in UTC. 12:00 UTC Monday is Monday morning in
+    # America/Chicago year-round (07:00 CDT / 06:00 CST), so it falls inside
+    # renovate.json's "on monday" schedule. The old 03:00 UTC was Sunday night
+    # in Chicago, so every scheduled run was outside the schedule and created
+    # no PRs.
+    - cron: '0 12 * * 1'
   workflow_dispatch:
   # Dependency dashboard checkbox interactions and PR comment commands.
   issues:
