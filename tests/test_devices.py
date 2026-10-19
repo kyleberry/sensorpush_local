@@ -98,6 +98,37 @@ async def test_setup_removes_duplicate_device_and_keeps_entity(
     assert entry.device_id == core_device.id
 
 
+async def test_setup_moves_other_integrations_entities_off_duplicate(
+    hass, our_entry, core_device
+):
+    """Another integration's entity on our duplicate moves to the core device.
+
+    After the 2026.8 split, Battery Notes' entities landed on our copy next to
+    the voltage sensor. Deleting the copy must not leave them without a device.
+    """
+    dev_reg = dr.async_get(hass)
+    ent_reg = er.async_get(hass)
+    duplicate = dev_reg.async_get_or_create(
+        config_entry_id=our_entry.entry_id,
+        identifiers={("bluetooth", MAC)},
+        name="Kitchen",
+    )
+    notes_entry = MockConfigEntry(domain="battery_notes", data={})
+    notes_entry.add_to_hass(hass)
+    notes_entity = ent_reg.async_get_or_create(
+        "sensor",
+        "battery_notes",
+        "bn_kitchen_battery_plus",
+        config_entry=notes_entry,
+        device_id=duplicate.id,
+    )
+
+    await _setup(hass, our_entry)
+
+    assert dev_reg.async_get(duplicate.id) is None
+    assert ent_reg.async_get(notes_entity.entity_id).device_id == core_device.id
+
+
 async def test_setup_removes_orphaned_device(hass, our_entry):
     """A device we own with no matching core device is removed with its entity."""
     dev_reg = dr.async_get(hass)

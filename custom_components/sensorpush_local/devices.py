@@ -11,6 +11,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.helper_integration import async_remove_helper_devices
 
 from .const import SENSORPUSH_DOMAIN
@@ -47,7 +48,34 @@ def async_remove_duplicate_devices(hass: HomeAssistant, entry: ConfigEntry) -> N
     Earlier versions of this integration also created such copies directly via
     DeviceInfo. Relink our entities to the core device and delete the copies.
     """
+    dev_reg = dr.async_get(hass)
+    ent_reg = er.async_get(hass)
+    own_devices = dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
+
     for device, _mac in async_get_source_devices(hass):
+        # Other integrations may have linked entities to our copy — e.g. after
+        # the 2026.8 split, Battery Notes' entities ended up on it next to our
+        # voltage sensor. async_remove_helper_devices only relinks *our*
+        # entities and HA detaches the rest when the device is removed, so
+        # move every entity on the copy to the core device first.
+        for duplicate in own_devices:
+            if not (
+                duplicate.identifiers & device.identifiers
+                or duplicate.connections & device.connections
+            ):
+                continue
+            for entity in er.async_entries_for_device(
+                ent_reg, duplicate.id, include_disabled_entities=True
+            ):
+                if entity.config_entry_id != entry.entry_id:
+                    _LOGGER.info(
+                        "Moving %s from duplicate device %s to %s",
+                        entity.entity_id,
+                        duplicate.id,
+                        device.id,
+                    )
+                    ent_reg.async_update_entity(entity.entity_id, device_id=device.id)
+
         async_remove_helper_devices(
             hass,
             helper_config_entry_id=entry.entry_id,
@@ -57,7 +85,6 @@ def async_remove_duplicate_devices(hass: HomeAssistant, entry: ConfigEntry) -> N
     # Anything still owned by this entry has no matching core device (the
     # sensor was removed from the sensorpush integration). Removing the device
     # also removes our entities that were linked to it.
-    dev_reg = dr.async_get(hass)
     for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
         _LOGGER.info(
             "Removing orphaned SensorPush Local device %s (%s)",
