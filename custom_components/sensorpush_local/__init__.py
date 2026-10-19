@@ -4,9 +4,7 @@ import struct
 
 from bleak import BleakError
 from bleak_retry_connector import BleakClientWithServiceCache as BleakClient
-from bleak_retry_connector import (
-    establish_connection,
-)
+from bleak_retry_connector import establish_connection
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
