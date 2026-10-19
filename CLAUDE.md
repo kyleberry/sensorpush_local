@@ -69,14 +69,15 @@ Since HA 2026.8 a device belongs to exactly one config entry; identifiers are on
 
 **`custom_components/sensorpush_local/config_flow.py`** — Single-instance only; no user input beyond clicking through. Exposes an `OptionsFlowHandler` with two configurable fields: `daily_audit_hour` (0–23, default 3) and `max_retries` (0–5, default 2), rendered as integer number boxes. Changing options triggers an entry reload via `entry.add_update_listener` → `_async_reload_entry`.
 
-**`custom_components/sensorpush_local/diagnostics.py`** — Implements the HA diagnostics platform (`async_get_config_entry_diagnostics`). Returns current option values, coordinator state (device count, lock state, last update success), and per-device audit data (voltage, RSSI, proxy source, model type, last audit timestamp).
+**`custom_components/sensorpush_local/diagnostics.py`** — Implements the HA diagnostics platform (`async_get_config_entry_diagnostics`). Returns current option values, coordinator state (device count, connection lock state, whether an audit is running, last update success), and per-device audit data (voltage, RSSI, proxy source, model type, last audit timestamp).
 
 ### Data Flow
 
 ```
 HA startup / 3am daily schedule / manual service call
   → SensorPushCoordinator._async_update_data()
-    → early exit if lock is already held (preserves existing data)
+    → early exit if an audit is already running (preserves existing data)
+    → holds _audit_lock for the whole pass
     → devices owned by core sensorpush config entries (dynamic discovery)
     → for each device: audit_device() acquires lock, performs GATT read, releases lock
       → RSSI and source from bluetooth.async_last_service_info (pre-connection)
@@ -85,6 +86,8 @@ HA startup / 3am daily schedule / manual service call
     → INFO log emitted: "audit complete — X/Y device(s) updated"
   → SensorPushVoltageSensor reads coordinator.data
 ```
+
+**Two locks:** `coordinator.lock` is held per GATT connection (inside `audit_device`) and is released between sensors and during the retry wait. `coordinator._audit_lock` is held for the whole `_async_update_data` pass, so a manual `run_audit` or scheduled refresh that arrives mid-audit is skipped instead of starting a second, overlapping pass. Don't make `audit_device` check `_audit_lock` — it runs inside it.
 
 **Important:** `_async_update_data` seeds `new_data` from the existing `self.data` dict before the audit loop. This means a device that is temporarily unreachable keeps its last-known value rather than disappearing from `coordinator.data`. Only successful audits overwrite an entry. Do not change this to `new_data = {}`.
 

@@ -119,7 +119,12 @@ class SensorPushCoordinator(DataUpdateCoordinator):
             update_interval=None,
             config_entry=entry,
         )
+        # Held per GATT connection, so only one connection runs at a time.
         self.lock = asyncio.Lock()
+        # Held for a whole audit pass. self.lock is released between sensors
+        # and during retry waits, so it can't tell a second refresh that an
+        # audit is already running.
+        self._audit_lock = asyncio.Lock()
         self.data = {}
         self._store = Store(hass, _STORAGE_VERSION, _STORAGE_KEY)
         self._unsub_daily_audit = None
@@ -127,6 +132,10 @@ class SensorPushCoordinator(DataUpdateCoordinator):
     def is_audit_locked(self) -> bool:
         """Check if the shared lock is currently held."""
         return self.lock.locked()
+
+    def is_audit_running(self) -> bool:
+        """Check if an audit pass is in progress."""
+        return self._audit_lock.locked()
 
     async def async_load_persisted_data(self):
         """Seed coordinator data from storage so entities survive a restart."""
@@ -137,36 +146,37 @@ class SensorPushCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch data for all registered SensorPush devices in a serial loop."""
-        if self.lock.locked():
+        if self.is_audit_running() or self.lock.locked():
             _LOGGER.debug(
                 "Audit already in progress — skipping concurrent refresh to preserve existing data."
             )
             return self.data
 
-        # Carry forward last-known data; only overwrite on successful audit
-        new_data = dict(self.data or {})
+        async with self._audit_lock:
+            # Carry forward last-known data; only overwrite on successful audit
+            new_data = dict(self.data or {})
 
-        # Devices owned by the core sensorpush integration
-        sensor_devices = async_get_source_devices(self.hass)
+            # Devices owned by the core sensorpush integration
+            sensor_devices = async_get_source_devices(self.hass)
 
-        updated = 0
-        for device, mac in sensor_devices:
-            name = device.name_by_user or device.name or "Unknown Sensor"
+            updated = 0
+            for device, mac in sensor_devices:
+                name = device.name_by_user or device.name or "Unknown Sensor"
 
-            # Perform the GATT audit
-            result = await self.audit_device(mac, name)
+                # Perform the GATT audit
+                result = await self.audit_device(mac, name)
 
-            if result:
-                new_data[mac] = result
-                updated += 1
+                if result:
+                    new_data[mac] = result
+                    updated += 1
 
-        _LOGGER.info(
-            "SensorPush Local audit complete — %d/%d device(s) updated",
-            updated,
-            len(sensor_devices),
-        )
-        await self._store.async_save(new_data)
-        return new_data
+            _LOGGER.info(
+                "SensorPush Local audit complete — %d/%d device(s) updated",
+                updated,
+                len(sensor_devices),
+            )
+            await self._store.async_save(new_data)
+            return new_data
 
     async def audit_device(self, mac: str, name: str):
         """Perform a GATT audit, retrying on timeout or BLE errors.

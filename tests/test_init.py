@@ -1,4 +1,5 @@
 # pylint: disable=unused-argument,protected-access
+import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -65,6 +66,53 @@ async def test_concurrent_refresh_preserves_data(hass, mock_coordinator, caplog)
 
     assert result == existing_data
     assert "skipping concurrent refresh" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_refresh_between_sensors_is_skipped(hass, mock_coordinator, sp_entry):
+    """A refresh while an audit is between sensors is skipped.
+
+    The per-connection lock is free between sensors and during retry waits;
+    the audit-wide lock must still stop a second pass from starting.
+    """
+    coordinator = mock_coordinator
+    dev_reg = dr.async_get(hass)
+    for mac in ("AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"):
+        dev_reg.async_get_or_create(
+            config_entry_id=sp_entry.entry_id,
+            identifiers={("bluetooth", mac)},
+            manufacturer=MANUFACTURER,
+            name=mac,
+        )
+
+    first_sensor_done = asyncio.Event()
+    release = asyncio.Event()
+    calls = []
+
+    async def fake_audit(mac, name):  # pylint: disable=unused-argument
+        calls.append(mac)
+        if len(calls) == 1:
+            # Pause between sensors, with the connection lock not held
+            first_sensor_done.set()
+            await release.wait()
+        return {"voltage": 3.0}
+
+    with patch.object(coordinator, "audit_device", side_effect=fake_audit):
+        first = asyncio.create_task(coordinator._async_update_data())
+        await first_sensor_done.wait()
+        assert not coordinator.lock.locked()
+        assert coordinator.is_audit_running()
+
+        second = await coordinator._async_update_data()
+        assert second == coordinator.data  # skipped, returned existing data
+        assert len(calls) == 1
+
+        release.set()
+        result = await first
+
+    assert len(calls) == 2
+    assert set(result) == {"AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02"}
+    assert not coordinator.is_audit_running()
 
 
 @pytest.mark.asyncio
@@ -220,6 +268,7 @@ async def test_persisted_data_none_leaves_data_empty(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_setup_loads_persisted_data(hass, mock_coordinator):
     """Test that async_setup_entry calls async_load_persisted_data before the background audit."""
     mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={})

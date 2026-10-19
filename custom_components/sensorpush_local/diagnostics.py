@@ -26,6 +26,7 @@ async def async_get_config_entry_diagnostics(
         "coordinator": {
             "device_count": len(coordinator.data) if coordinator.data else 0,
             "audit_locked": coordinator.is_audit_locked(),
+            "audit_running": coordinator.is_audit_running(),
             "last_update_success": coordinator.last_update_success,
         },
         "devices": {

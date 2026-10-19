@@ -1,5 +1,6 @@
 run_audit:
   name: Run Manual Audit
   description: >-
-    Triggers an immediate Bluetooth GATT audit of all configured SensorPush
-    devices, bypassing the standard 24-hour interval.
+    Triggers an immediate Bluetooth GATT audit of all SensorPush devices,
+    without waiting for the daily scheduled audit. Skipped if an audit is
+    already running.
