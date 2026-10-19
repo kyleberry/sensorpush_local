@@ -9,7 +9,9 @@
   "prHourlyLimit": 0,
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["on monday"]
+    "schedule": ["on monday"],
+    "automerge": true,
+    "minimumReleaseAge": null
   },
   "packageRules": [
     {
@@ -45,6 +47,12 @@
       "description": "Hold Python at the version Home Assistant runs on. HA 2026.10 targets 3.14, and some locked deps (e.g. pyyaml 6.0.3) ship no 3.15 wheels. Raise this cap when HA moves to 3.15.",
       "matchPackageNames": ["python"],
       "allowedVersions": "<3.15"
+    },
+    {
+      "description": "Leave the requires-python floor alone. Raising it to every new 3.14.x patch makes uv.lock need that exact Python, which older uv builds (including the one Renovate runs with) can't download.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["requires-python"],
+      "enabled": false
     }
   ],
   "assignees": ["kyleberry"]
