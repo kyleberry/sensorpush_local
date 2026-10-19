@@ -36,7 +36,7 @@ test = [
     "pytest-cov==7.1.0",
     "argcomplete==3.7.2",
     "black==26.10.1",
-    "flake8==7.3.0",
+    "flake8==7.4.1",
     "flake8-pyproject==1.2.4",
     "isort==8.0.1",
     "pylint==4.0.6",
