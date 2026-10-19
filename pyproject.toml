@@ -25,8 +25,8 @@ dependencies = [
     # (serialx imports aioesphomeapi) — same undeclared-transitive-dependency
     # pattern as aiousbwatcher/pyserial above. Keep these at the versions in
     # HA's usb and esphome manifests for the pinned homeassistant release.
-    "serialx==1.11.0",
-    "aioesphomeapi==46.6.0",
+    "serialx==1.14.0",
+    "aioesphomeapi==46.12.1",
 ]
 
 [project.optional-dependencies]
