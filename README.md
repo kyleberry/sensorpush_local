@@ -58,7 +58,7 @@ This integration provides a service to trigger an audit of all sensors manually 
 
 * **Service:** `sensorpush_local.run_audit`
 
-If an audit is already in progress, the call is skipped and the existing values are kept.
+If a sensor connection is in progress when the call arrives, the call is skipped and the existing values are kept.
 
 ## 📊 Technical Attributes
 
