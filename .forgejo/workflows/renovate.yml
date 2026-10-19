@@ -7,7 +7,12 @@ on:
     # renovate.json's "on monday" schedule. The old 03:00 UTC was Sunday night
     # in Chicago, so every scheduled run was outside the schedule and created
     # no PRs.
-    - cron: '0 12 * * 1'
+    #
+    # Runs daily, not just Mondays. Outside the schedule Renovate opens no new
+    # PRs, but it still automerges green ones. Forgejo-native automerge is only
+    # queued when a PR is created, so a PR rebased or green after the last run
+    # (e.g. lock file maintenance) otherwise waits a week.
+    - cron: '0 12 * * *'
   workflow_dispatch:
   # Dependency dashboard checkbox interactions and PR comment commands.
   issues:
