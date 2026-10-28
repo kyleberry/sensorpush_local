@@ -5,7 +5,7 @@ description = "Local Bluetooth monitoring for SensorPush devices"
 readme = "README.md"
 requires-python = ">=3.14.6,<3.15"
 dependencies = [
-    "homeassistant==2026.10.2",
+    "homeassistant==2026.10.4",
     "bleak-retry-connector==4.7.1",
     # habluetooth is transitive (pulled in by bleak-retry-connector and
     # homeassistant) but pinned explicitly so it's a named package Renovate's
@@ -25,13 +25,13 @@ dependencies = [
     # (serialx imports aioesphomeapi) — same undeclared-transitive-dependency
     # pattern as aiousbwatcher/pyserial above. Keep these at the versions in
     # HA's usb and esphome manifests for the pinned homeassistant release.
-    "serialx==1.14.0",
-    "aioesphomeapi==46.12.1",
+    "serialx==1.15.0",
+    "aioesphomeapi==46.22.0",
 ]
 
 [project.optional-dependencies]
 test = [
-    "pytest-homeassistant-custom-component==0.13.373",
+    "pytest-homeassistant-custom-component==0.13.375",
     "pytest-asyncio==1.4.0",
     "pytest-cov==7.1.0",
     "argcomplete==3.7.2",
