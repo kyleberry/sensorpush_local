@@ -36,6 +36,19 @@ name: Release
 # Named without the FORGEJO_ prefix because Forgejo reserves that
 # prefix for its own secret names (same restriction GitHub applies to
 # GITHUB_-prefixed secrets).
+#
+# The release commit and the vX.Y.Z tag are GPG-signed as Release Bot
+# (the account behind FORGEJORELEASE_TOKEN), so they show as verified
+# and pass "Require signed commits". RELEASE_BOT_GPG_KEY is that key's
+# armored private key (no passphrase), added as a repo secret by hand;
+# the public half is verified on the release-bot account. Forgejo
+# verifies against the committer email, so the git identity below must
+# stay release-bot@berry.house, the key's UID and the account's email.
+
+env:
+  RELEASE_BOT_NAME: Release Bot
+  RELEASE_BOT_EMAIL: release-bot@berry.house
+  RELEASE_BOT_GPG_FINGERPRINT: F30E9B523A11E90792B854401CF40FBE203A94DA
 
 on:
   workflow_dispatch:
@@ -160,12 +173,25 @@ jobs:
       - name: Refresh uv.lock for the new version
         run: uv lock
 
+      - name: Set up Release Bot commit signing
+        env:
+          RELEASE_BOT_GPG_KEY: ${{ secrets.RELEASE_BOT_GPG_KEY }}
+        run: |
+          if [ -z "$RELEASE_BOT_GPG_KEY" ]; then
+            echo "::error::RELEASE_BOT_GPG_KEY secret is not set"
+            exit 1
+          fi
+          printf '%s\n' "$RELEASE_BOT_GPG_KEY" | gpg --batch --import
+          gpg --batch --list-secret-keys "$RELEASE_BOT_GPG_FINGERPRINT"
+          git config user.name "$RELEASE_BOT_NAME"
+          git config user.email "$RELEASE_BOT_EMAIL"
+          git config user.signingkey "$RELEASE_BOT_GPG_FINGERPRINT"
+          git config commit.gpgSign true
+
       - name: Commit version bump to a release branch
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          git config user.name "forgejo-actions"
-          git config user.email "actions@git.berry.house"
           git checkout -b "release/v$VERSION"
           git add custom_components/sensorpush_local/manifest.json pyproject.toml README.md uv.lock
           git commit -m "Release v$VERSION"
@@ -243,13 +269,25 @@ jobs:
           VERSION=$(grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Release Bot tag signing
+        env:
+          RELEASE_BOT_GPG_KEY: ${{ secrets.RELEASE_BOT_GPG_KEY }}
+        run: |
+          if [ -z "$RELEASE_BOT_GPG_KEY" ]; then
+            echo "::error::RELEASE_BOT_GPG_KEY secret is not set"
+            exit 1
+          fi
+          printf '%s\n' "$RELEASE_BOT_GPG_KEY" | gpg --batch --import
+          gpg --batch --list-secret-keys "$RELEASE_BOT_GPG_FINGERPRINT"
+          git config user.name "$RELEASE_BOT_NAME"
+          git config user.email "$RELEASE_BOT_EMAIL"
+          git config user.signingkey "$RELEASE_BOT_GPG_FINGERPRINT"
+
       - name: Tag release
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          git config user.name "forgejo-actions"
-          git config user.email "actions@git.berry.house"
-          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git tag -s "v$VERSION" -m "Release v$VERSION"
           git push origin "v$VERSION"
 
       - name: Generate changelog
