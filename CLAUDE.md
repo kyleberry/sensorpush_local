@@ -143,7 +143,7 @@ Releases are automated via the `.forgejo/workflows/release.yml` workflow, split 
 
 The release commit and the `vX.Y.Z` tag are GPG-signed as `Release Bot <release-bot@berry.house>`, the account behind `FORGEJORELEASE_TOKEN`. The `RELEASE_BOT_GPG_KEY` secret holds that key's armored private key (no passphrase); the public half is verified on the release-bot account. Forgejo verifies a signature against the committer email, so keep the workflow's git identity matching the key's UID and the account email. The fingerprint is `RELEASE_BOT_GPG_FINGERPRINT` at the top of `release.yml`; change it there when rotating the key. Renovate's commits are signed with the renovate-bot key through `RENOVATE_GIT_PRIVATE_KEY` in `renovate.yml`.
 
-Do not bump these files or create tags manually — the workflow is the only supported release path. If auto-merge doesn't fire (e.g. the required status check config changes), merge the `release/vX.Y.Z` PR manually — `finalize-release` still triggers on any merge of a matching branch, however it happened.
+Do not bump these files or create tags manually — the workflow is the only supported release path. If auto-merge doesn't fire (e.g. the required status check config changes), merge the `release/vX.Y.Z` PR manually — `finalize-release` still triggers on any merge of a matching branch, however it happened. Auto-merge is scheduled as `fast-forward-only`, the repo's default style, so Release Bot's signed commit lands on main unchanged. The old `merge` style isn't allowed here, so Forgejo accepted the schedule but couldn't complete it; v1.0.5 was squashed by hand. If main moved during CI, use "Update branch by rebase" rather than a squash.
 
 ## Devcontainer / ~/.claude mounts
 

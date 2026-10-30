@@ -233,8 +233,14 @@ jobs:
           FORGEJO_TOKEN: ${{ secrets.FORGEJORELEASE_TOKEN }}
           FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
           PR_NUMBER: ${{ steps.create_pr.outputs.pr_number }}
+        # fast-forward-only lands Release Bot's signed commit on main as-is.
+        # This repo allows only squash and fast-forward merges, so the old
+        # "merge" style was accepted when scheduled but couldn't complete;
+        # v1.0.5 was squashed by hand, which replaced the bot's commit. If
+        # main moves during CI, "Update branch by rebase" makes it
+        # fast-forwardable again; Forgejo signs the rebased commit.
         run: |
-          jq -n '{Do: "merge", merge_when_checks_succeed: true, delete_branch_after_merge: true}' \
+          jq -n '{Do: "fast-forward-only", merge_when_checks_succeed: true, delete_branch_after_merge: true}' \
             > /tmp/automerge_payload.json
 
           http_status=$(curl -s -o /tmp/automerge_response.json -w "%{http_code}" \
