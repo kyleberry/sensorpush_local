@@ -3,15 +3,17 @@ name: CI
 # No `permissions:` block — Forgejo doesn't scope FORGEJO_TOKEN/GITHUB_TOKEN
 # via this field (GitHub-compat syntax only, a no-op here).
 
+# PRs only. Branches get a PR right away, so branch-push runs were
+# duplicates. This job is main's required check (`CI / test (pull_request)`):
+# it used to be skipped for same-repo PRs, and Forgejo counts a skipped check
+# as passed, so it never gated anything. Release PRs still trigger it because
+# release.yml opens them with FORGEJORELEASE_TOKEN, not the Actions token.
 on:
-  push:
-    branches: ["**"]
   pull_request:
     branches: ["main"]
 
 jobs:
   test:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: debian-trixie
     container:
       image: python:3.14-bookworm
