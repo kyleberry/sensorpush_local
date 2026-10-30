@@ -32,8 +32,11 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest-homeassistant-custom-component==0.13.375",
-    "pytest-asyncio==1.4.0",
-    "pytest-cov==7.1.0",
+    # Unpinned on purpose: pytest-homeassistant-custom-component pins both
+    # exactly, so its release decides the version (uv.lock records it). An
+    # exact pin here breaks `uv lock` whenever either releases ahead of it.
+    "pytest-asyncio",
+    "pytest-cov",
     "argcomplete==3.7.2",
     "black==26.10.1",
     "flake8==7.4.1",

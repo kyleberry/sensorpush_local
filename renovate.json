@@ -33,8 +33,6 @@
         "homeassistant",
         "pytest-homeassistant-custom-component",
         "bleak-retry-connector",
-        "pytest-asyncio",
-        "pytest-cov",
         "habluetooth",
         "serialx",
         "aioesphomeapi"
