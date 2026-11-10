@@ -161,10 +161,16 @@ The release commit and the `vX.Y.Z` tag are GPG-signed as `Release Bot <release-
 
 Do not bump these files or create tags manually — the workflow is the only supported release path. If auto-merge doesn't fire (e.g. the required status check config changes), merge the `release/vX.Y.Z` PR manually — `finalize-release` still triggers on any merge of a matching branch, however it happened. Auto-merge is scheduled as `fast-forward-only`, the repo's default style, so Release Bot's signed commit lands on main unchanged. The old `merge` style isn't allowed here, so Forgejo accepted the schedule but couldn't complete it; v1.0.5 was squashed by hand. If main moved during CI, use "Update branch by rebase" rather than a squash.
 
+## CI image
+
+`.devcontainer/Dockerfile` builds one image for both the devcontainer and CI (SENS-10): Python 3.14 (the integration's version), the test suite's system packages, gnupg for Release Bot's signing, and Node.js for the runner's JavaScript actions. `.forgejo/workflows/ci-image.yml` builds it, runs `.devcontainer/smoke-test.sh` and the full test suite inside it, and publishes it as `registry.berry.house/sensorpush-local/ci` with two tags: the Dockerfile's hash and `:latest`. It runs on every push to `main` but only builds when `:latest` isn't already the current Dockerfile's image, so a failed publish is redone by the next merge. PRs that touch the image build and check it under a throwaway local tag and never push. Change the Python version or system packages only in the Dockerfile.
+
+Pushing uses the Zot user `sensorpush-local`, which can push only under `sensorpush-local/` (homelab HOME-359; the shared `ci` user can't push there). Its credentials are the `Zot Registry sensorpush-local Push` item, which exists in both the Sensorpush-Local vault (for this workflow) and homelab's Homelab vault (for the zot Ansible role). A 1Password service account's vault access can't be changed after it's created, so each side has its own copy: rotate both together, then rerun homelab's zot play.
+
 ## Devcontainer / ~/.claude mounts
 
 Mount only cross-platform-safe subdirectories — not `~/.claude` wholesale. Plugins are platform-specific binaries; mounting them from macOS into Linux breaks them. Safe to share: `settings.json`, `skills/`, `projects/`.
 
-Because `~/.claude/plugins` isn't mounted, `.devcontainer/post-create.sh` installs the `kyle-dev` and `berry-mcp` plugins (kyleberry/claude-plugins) inside the container. kyle-dev's guard hook blocks commits on main and needs `jq`, which the Dockerfile installs. If gitea.berry.house is unreachable at create time, the script warns and carries on; rerun it later.
+Because `~/.claude/plugins` isn't mounted, `.devcontainer/post-create.sh` installs the `kyle-dev` and `berry-mcp` plugins (kyleberry/claude-plugins) inside the container. kyle-dev's guard hook blocks commits on main and needs `jq`, which the Dockerfile installs (the same Dockerfile builds the CI image, see above). If gitea.berry.house is unreachable at create time, the script warns and carries on; rerun it later.
 
 berry-mcp needs `MCP_BEARER_TOKEN`, passed in via `containerEnv` from the environment of whatever starts the container. Open VS Code from a terminal in this repo (`code .`), so direnv has loaded it from `~/git/.envrc`. `runArgs` points the container's DNS at AdGuard (192.168.86.2) so `mcp.berry.house` resolves to Caddy on the LAN, as on the host.
