@@ -10,7 +10,9 @@ as before, and the release still goes out.
 Writes two files to --out-dir, which differ only in the compare link:
 forgejo.md and github.md.
 
-Standard library only: it runs straight on the CI runner's python3.
+Standard library only: it runs straight on the CI runner's python3, which
+is Debian trixie's 3.13, not the 3.14 the integration targets. Keep it
+3.13-compatible; tests/test_release_notes.py checks.
 
 Environment:
   RELEASE_BOT_OPENROUTER_KEY  OpenRouter API key. Without it the notes are
@@ -153,7 +155,7 @@ def pins(ref: str) -> dict[str, str]:
 def min_ha_version(ref: str) -> str | None:
     try:
         return json.loads(git("show", f"{ref}:hacs.json")).get("homeassistant")
-    except subprocess.CalledProcessError, json.JSONDecodeError:
+    except (subprocess.CalledProcessError, json.JSONDecodeError):
         return None
 
 

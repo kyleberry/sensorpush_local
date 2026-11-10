@@ -300,13 +300,22 @@ jobs:
 
       # An OpenRouter model writes a summary and sorts the changes into
       # sections; the full commit list and compare link are always appended.
-      # Any model failure falls back to the commit list alone, so this step
-      # never blocks a release (SENS-9). Preview with release-notes.yml.
+      # Any model failure falls back to the commit list alone, and if the
+      # script itself fails, this step writes that list directly. The tag is
+      # already pushed by now, so this step must never fail the release
+      # (SENS-9). Preview with release-notes.yml.
       - name: Write release notes
         env:
           VERSION: ${{ steps.version.outputs.version }}
           RELEASE_BOT_OPENROUTER_KEY: ${{ secrets.RELEASE_BOT_OPENROUTER_KEY }}
-        run: python3 scripts/release_notes.py "v$VERSION" --out-dir /tmp/release_notes
+        run: |
+          if ! python3 scripts/release_notes.py "v$VERSION" --out-dir /tmp/release_notes; then
+            echo "::warning::release_notes.py failed; using the plain commit list"
+            mkdir -p /tmp/release_notes
+            PREVIOUS_TAG=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || echo "")
+            git log --pretty=format:"- %s (%h)" "${PREVIOUS_TAG:+$PREVIOUS_TAG..}v$VERSION" > /tmp/release_notes/forgejo.md
+            cp /tmp/release_notes/forgejo.md /tmp/release_notes/github.md
+          fi
 
       - name: Create Forgejo release
         env:
