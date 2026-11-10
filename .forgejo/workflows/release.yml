@@ -6,7 +6,10 @@ name: Release
 # "Read and write" (repo Settings > Actions > General) so the default
 # token can create the Forgejo release in finalize-release.
 # GH_RELEASE_TOKEN is only used for the two GitHub API calls (poll +
-# create release) — it never touches Forgejo.
+# create release) — it never touches Forgejo. CODEBERG_RELEASE_TOKEN does
+# the same for Codeberg (SENS-7): a Codeberg access token with
+# write:repository scope. Both mirrors are push mirrors of this repo, set in
+# repo Settings > Repository > Mirror settings, so tags reach them on push.
 # RELEASE_BOT_OPENROUTER_KEY is Release Bot's own OpenRouter key ($10/month
 # limit), used only by scripts/release_notes.py.
 #
@@ -315,6 +318,7 @@ jobs:
             PREVIOUS_TAG=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || echo "")
             git log --pretty=format:"- %s (%h)" "${PREVIOUS_TAG:+$PREVIOUS_TAG..}v$VERSION" > /tmp/release_notes/forgejo.md
             cp /tmp/release_notes/forgejo.md /tmp/release_notes/github.md
+            cp /tmp/release_notes/forgejo.md /tmp/release_notes/codeberg.md
           fi
 
       - name: Create Forgejo release
@@ -388,3 +392,51 @@ jobs:
           fi
 
           echo "Release created: $(jq -r '.html_url' /tmp/release_response.json)"
+
+      # Codeberg runs Forgejo, so this is the same API as the Forgejo release
+      # above. It runs last: Codeberg is the newest mirror, and a problem
+      # there shouldn't hold up the GitHub release (SENS-7).
+      - name: Wait for push mirror to sync tag to Codeberg
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_RELEASE_TOKEN }}
+        run: |
+          for i in $(seq 1 12); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: token $CODEBERG_TOKEN" \
+              "https://codeberg.org/api/v1/repos/kyleberry/sensorpush_local/tags/v$VERSION")
+            if [ "$status" = "200" ]; then
+              echo "Tag v$VERSION found on Codeberg"
+              exit 0
+            fi
+            echo "Tag not on Codeberg yet (attempt $i/12), waiting 5s..."
+            sleep 5
+          done
+          echo "::error::Tag v$VERSION never appeared on Codeberg after 60s — check the push mirror config in repo settings"
+          exit 1
+
+      - name: Create Codeberg release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_RELEASE_TOKEN }}
+        run: |
+          jq -n \
+            --arg tag "v$VERSION" \
+            --arg name "v$VERSION" \
+            --rawfile body /tmp/release_notes/codeberg.md \
+            '{tag_name: $tag, name: $name, body: $body}' > /tmp/codeberg_release_payload.json
+
+          http_status=$(curl -s -o /tmp/codeberg_release_response.json -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: token $CODEBERG_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://codeberg.org/api/v1/repos/kyleberry/sensorpush_local/releases" \
+            -d @/tmp/codeberg_release_payload.json)
+
+          if [ "$http_status" != "201" ]; then
+            echo "::error::Codeberg release creation failed with status $http_status"
+            cat /tmp/codeberg_release_response.json
+            exit 1
+          fi
+
+          echo "Codeberg release created: $(jq -r '.html_url' /tmp/codeberg_release_response.json)"

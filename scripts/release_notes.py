@@ -7,8 +7,8 @@ so nothing is lost if the model leaves something out. If the model call
 fails, or its answer can't be used, the notes are just the commit list,
 as before, and the release still goes out.
 
-Writes two files to --out-dir, which differ only in the compare link:
-forgejo.md and github.md.
+Writes one file per release host to --out-dir, differing only in the
+compare link: forgejo.md, github.md and codeberg.md.
 
 Standard library only: it runs straight on the CI runner's python3, which
 is Debian trixie's 3.13, not the 3.14 the integration targets. Keep it
@@ -41,6 +41,7 @@ MODEL = "openai/gpt-6.1-sol"
 PROVIDER = {"order": ["openai"], "allow_fallbacks": False, "data_collection": "deny"}
 FORGEJO_REPO_URL = "https://gitea.berry.house/kyleberry/sensorpush_local"
 GITHUB_REPO_URL = "https://github.com/kyleberry/sensorpush_local"
+CODEBERG_REPO_URL = "https://codeberg.org/kyleberry/sensorpush_local"
 # Total time for the model call, retries included.
 DEADLINE_SECONDS = 300
 
@@ -330,7 +331,12 @@ def main() -> int:
             )
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    for name, repo_url in (("forgejo", FORGEJO_REPO_URL), ("github", GITHUB_REPO_URL)):
+    hosts = (
+        ("forgejo", FORGEJO_REPO_URL),
+        ("github", GITHUB_REPO_URL),
+        ("codeberg", CODEBERG_REPO_URL),
+    )
+    for name, repo_url in hosts:
         compare = f"{repo_url}/compare/{prev}...{tag}" if prev else None
         (args.out_dir / f"{name}.md").write_text(
             notes(ai_part, commits, count, compare)
