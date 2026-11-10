@@ -1,0 +1,37 @@
+name: Release notes preview
+
+# Writes the release notes for an existing tag and prints them to the job
+# log, without creating or changing a release (SENS-9). Use it to check the
+# notes scripts/release_notes.py would write, e.g. after changing its prompt.
+# Each run makes one OpenRouter call on Release Bot's key.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to write notes for (e.g. v1.0.6)'
+        required: true
+        type: string
+
+jobs:
+  preview:
+    name: Preview release notes
+    runs-on: debian-trixie
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Write release notes
+        env:
+          TAG: ${{ inputs.tag }}
+          RELEASE_BOT_OPENROUTER_KEY: ${{ secrets.RELEASE_BOT_OPENROUTER_KEY }}
+        run: |
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag '$TAG' doesn't exist"
+            exit 1
+          fi
+          python3 scripts/release_notes.py "$TAG" --out-dir /tmp/release_notes
+          echo "================ GitHub release body ================"
+          cat /tmp/release_notes/github.md

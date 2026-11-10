@@ -35,17 +35,17 @@ Tests run with `asyncio_mode = "auto"` — all async tests are handled automatic
 Four tools are enforced in CI. Run them locally before pushing:
 
 ```bash
-uv run black custom_components/ tests/                  # format
-uv run isort custom_components/ tests/                  # sort imports
-uv run flake8 custom_components/ tests/                 # style + unused imports
-uv run pylint custom_components/ tests/                 # static analysis
+uv run black custom_components/ tests/ scripts/                  # format
+uv run isort custom_components/ tests/ scripts/                  # sort imports
+uv run flake8 custom_components/ tests/ scripts/                 # style + unused imports
+uv run pylint custom_components/ tests/ scripts/                 # static analysis
 ```
 
 To check without modifying files:
 
 ```bash
-uv run black --check --target-version py313 custom_components/ tests/
-uv run isort --check-only custom_components/ tests/
+uv run black --check --target-version py313 custom_components/ tests/ scripts/
+uv run isort --check-only custom_components/ tests/ scripts/
 ```
 
 ## Managing dependencies

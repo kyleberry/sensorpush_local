@@ -7,6 +7,8 @@ name: Release
 # token can create the Forgejo release in finalize-release.
 # GH_RELEASE_TOKEN is only used for the two GitHub API calls (poll +
 # create release) — it never touches Forgejo.
+# RELEASE_BOT_OPENROUTER_KEY is Release Bot's own OpenRouter key ($10/month
+# limit), used only by scripts/release_notes.py.
 #
 # Split into two triggers instead of one straight-through job because
 # Forgejo has an open bug (codeberg.org/forgejo/forgejo/issues/11159):
@@ -124,19 +126,19 @@ jobs:
 
       - name: Check formatting (black)
         run: |
-          black --check --target-version py313 custom_components/ tests/
+          black --check --target-version py313 custom_components/ tests/ scripts/
 
       - name: Check import order (isort)
         run: |
-          isort --check-only custom_components/ tests/
+          isort --check-only custom_components/ tests/ scripts/
 
       - name: Lint (flake8)
         run: |
-          flake8 custom_components/ tests/
+          flake8 custom_components/ tests/ scripts/
 
       - name: Lint (pylint)
         run: |
-          pylint custom_components/ tests/ --fail-under=9.5
+          pylint custom_components/ tests/ scripts/ --fail-under=9.5
 
   prepare-release:
     name: Prepare release PR
@@ -296,34 +298,26 @@ jobs:
           git tag -s "v$VERSION" -m "Release v$VERSION"
           git push origin "v$VERSION"
 
-      - name: Generate changelog
-        id: changelog
+      # An OpenRouter model writes a summary and sorts the changes into
+      # sections; the full commit list and compare link are always appended.
+      # Any model failure falls back to the commit list alone, so this step
+      # never blocks a release (SENS-9). Preview with release-notes.yml.
+      - name: Write release notes
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || echo "")
-          if [ -n "$PREVIOUS_TAG" ]; then
-            LOG=$(git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG..v$VERSION")
-          else
-            LOG=$(git log --pretty=format:"- %s (%h)" "v$VERSION")
-          fi
-          {
-            echo "changelog<<CHANGELOG_EOF"
-            echo "$LOG"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
+          RELEASE_BOT_OPENROUTER_KEY: ${{ secrets.RELEASE_BOT_OPENROUTER_KEY }}
+        run: python3 scripts/release_notes.py "v$VERSION" --out-dir /tmp/release_notes
 
       - name: Create Forgejo release
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
           FORGEJO_TOKEN: ${{ github.token }}
           FORGEJO_RELEASES_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}/releases
         run: |
           jq -n \
             --arg tag "v$VERSION" \
             --arg name "v$VERSION" \
-            --arg body "$CHANGELOG" \
+            --rawfile body /tmp/release_notes/forgejo.md \
             '{tag_name: $tag, name: $name, body: $body}' > /tmp/forgejo_release_payload.json
 
           http_status=$(curl -s -o /tmp/forgejo_release_response.json -w "%{http_code}" \
@@ -363,13 +357,12 @@ jobs:
       - name: Create GitHub release
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
         run: |
           jq -n \
             --arg tag "v$VERSION" \
             --arg name "v$VERSION" \
-            --arg body "$CHANGELOG" \
+            --rawfile body /tmp/release_notes/github.md \
             '{tag_name: $tag, name: $name, body: $body}' > /tmp/release_payload.json
 
           http_status=$(curl -s -o /tmp/release_response.json -w "%{http_code}" \
