@@ -74,9 +74,8 @@ filterwarnings = [
 
 [tool.black]
 line-length = 88
-# Same as CI's --target-version. Without it black infers 3.14 from
-# requires-python and drops the parentheses from `except (A, B):`, which
-# scripts/release_notes.py can't have: it runs on the CI runner's 3.13.
+# Same as CI's --target-version, so a plain local `black` run formats the way
+# CI checks. Without it black infers 3.14 from requires-python.
 target-version = ["py313"]
 
 [tool.isort]

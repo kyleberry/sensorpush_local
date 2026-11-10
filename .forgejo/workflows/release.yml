@@ -98,25 +98,13 @@ jobs:
     needs: validate
     runs-on: debian-trixie
     container:
-      image: python:3.14-bookworm
+      # .devcontainer/Dockerfile, published by ci-image.yml (SENS-10). The
+      # runner force-pulls :latest before every job.
+      image: registry.berry.house/sensorpush-local/ci:latest
 
     steps:
-      - name: Install System Dependencies
-        run: |
-          apt-get update
-          apt-get install -y build-essential libudev-dev bluez git curl ca-certificates gnupg
-          # act_runner executes JS-based actions (actions/checkout, etc.) by
-          # running `node` inside this job container. python:3.13-bookworm
-          # doesn't ship one, so install it explicitly — same NodeSource
-          # approach as the homelab act-runner image.
-          curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-          apt-get install -y --no-install-recommends nodejs
-
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Install uv
-        run: pip install uv
 
       - name: Cache uv downloads
         id: uv_cache
@@ -160,6 +148,10 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: debian-trixie
+    container:
+      # .devcontainer/Dockerfile, published by ci-image.yml (SENS-10). The
+      # runner force-pulls :latest before every job.
+      image: registry.berry.house/sensorpush-local/ci:latest
     steps:
       - name: Load secrets from 1Password
         uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
@@ -202,14 +194,6 @@ jobs:
       # [[package]] entry) — it must be refreshed here or `uv sync --locked`
       # in ci.yml/release.yml's test job will fail on the next run after a
       # release, since it'd be out of sync with the version just bumped above.
-      # This job runs directly on the runner (no `container:`), so it can't
-      # assume pip is present the way the containerized test job can — the
-      # standalone installer doesn't need one.
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
       - name: Refresh uv.lock for the new version
         run: uv lock
 
@@ -298,6 +282,10 @@ jobs:
     name: Finalize release
     if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
     runs-on: debian-trixie
+    container:
+      # .devcontainer/Dockerfile, published by ci-image.yml (SENS-10). The
+      # runner force-pulls :latest before every job.
+      image: registry.berry.house/sensorpush-local/ci:latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

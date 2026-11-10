@@ -10,9 +10,8 @@ as before, and the release still goes out.
 Writes one file per release host to --out-dir, differing only in the
 compare link: forgejo.md, github.md and codeberg.md.
 
-Standard library only: it runs straight on the CI runner's python3, which
-is Debian trixie's 3.13, not the 3.14 the integration targets. Keep it
-3.13-compatible; tests/test_release_notes.py checks.
+Standard library only. CI runs it in the project's CI image (Python 3.14,
+SENS-10), so no project dependencies need installing first.
 
 Environment:
   RELEASE_BOT_OPENROUTER_KEY  OpenRouter API key. Without it the notes are

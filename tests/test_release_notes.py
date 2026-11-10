@@ -1,6 +1,5 @@
 """Tests for scripts/release_notes.py (SENS-9)."""
 
-import ast
 import importlib.util
 import json
 from pathlib import Path
@@ -81,8 +80,3 @@ def test_pin_regex_strips_extras():
     match = release_notes.PIN.match('    "pytest-homeassistant[bluetooth]==2026.11.1",')
     assert match.group(1) == "pytest-homeassistant[bluetooth]"
     assert match.group(2) == "2026.11.1"
-
-
-def test_script_parses_as_python_3_13():
-    """The release job runs the script on the runner's python3 (3.13)."""
-    ast.parse(_SCRIPT.read_text(), feature_version=(3, 13))

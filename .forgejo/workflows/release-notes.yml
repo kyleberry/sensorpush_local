@@ -17,6 +17,10 @@ jobs:
   preview:
     name: Preview release notes
     runs-on: debian-trixie
+    container:
+      # .devcontainer/Dockerfile, published by ci-image.yml (SENS-10). The
+      # runner force-pulls :latest before every job.
+      image: registry.berry.house/sensorpush-local/ci:latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
