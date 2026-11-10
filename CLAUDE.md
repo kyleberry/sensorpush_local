@@ -139,15 +139,15 @@ Releases are automated via the `.forgejo/workflows/release.yml` workflow, split 
 1. **`prepare-release`** runs the full test/lint suite, bumps the version in `manifest.json`, `pyproject.toml`, and the README badge, refreshes `uv.lock`'s self-version entry, commits to a new `release/vX.Y.Z` branch (not `main` — unaffected by the bug), opens a PR, and schedules auto-merge.
 2. **`finalize-release`** triggers on that PR's merge (`pull_request: types: [closed]`, filtered to merged PRs on a `release/*` branch), tags `vX.Y.Z` (tag pushes aren't covered by branch protection, so unaffected by the bug), creates a release on this Forgejo instance, waits for the push mirrors to sync the tag to GitHub and then Codeberg, and creates a release on each. All three releases get the notes from `scripts/release_notes.py` (see below).
 
-**Secrets come from 1Password** (SENS-11), the same pattern as homelab's workflows. The only Forgejo repo secret the workflows use is `OP_SERVICE_ACCOUNT_TOKEN`, a 1Password service account that can read just the `Sensorpush-Local` vault. Each job loads its secrets with `1password/load-secrets-action` (`export-env: true`). To rotate a secret, update its 1Password item; the workflows don't change.
+**Secrets come from 1Password** (SENS-11), the same pattern as homelab's workflows. The only Forgejo repo secret the workflows use is `OP_SERVICE_ACCOUNT_TOKEN`, a 1Password service account that can read just the `Sensorpush-Local` vault. Each job loads its secrets with `1password/load-secrets-action` (`export-env: true`). To rotate a secret, update its 1Password item; the workflows don't change. Env var names avoid the `FORGEJO_`, `GITHUB_` and `GITEA_` prefixes: the runner sets its own variables there (`FORGEJO_TOKEN` is the automatic Actions token, mirrored as `GITHUB_TOKEN`), and Forgejo rejects secret and variable names that use them. That rule is why the old Forgejo secrets were named `FORGEJORELEASE_TOKEN` and `GH_RELEASE_TOKEN`. 1Password item titles have no such limit.
 
 | Env var | 1Password item (`Sensorpush-Local` vault) | Used by |
 | --- | --- | --- |
-| `RELEASE_BOT_FORGEJO_TOKEN` | `Release Bot Forgejo Token` / `password` | `prepare-release`: release branch push, PR, auto-merge |
+| `RELEASE_BOT_FORGEJO_TOKEN` | `FORGEJO_RELEASE_TOKEN` / `password` | `prepare-release`: release branch push, PR, auto-merge |
 | `RELEASE_BOT_GPG_KEY` | `Release Bot GPG Key` / file `release-bot-private.key` | signing the release commit and tag |
 | `RELEASE_BOT_OPENROUTER_KEY` | `Release Bot OpenRouter Key` / `password` | `scripts/release_notes.py` |
-| `GH_RELEASE_TOKEN` | `GitHub Release Token` / `password` | GitHub tag poll and release |
-| `CODEBERG_RELEASE_TOKEN` | `Codeberg Release Token` / `password` | Codeberg tag poll and release |
+| `GH_RELEASE_TOKEN` | `GITHUB_RELEASE_TOKEN` / `password` | GitHub tag poll and release |
+| `CODEBERG_RELEASE_TOKEN` | `CODEBERG_RELEASE_TOKEN` / `password` | Codeberg tag poll and release |
 
 `prepare-release` also resolves `finalize-release`'s secrets, without exporting them, so a missing or renamed item fails the run before the release branch exists. Otherwise it would fail after `finalize-release` had already pushed the tag. Renovate's secrets (`RENOVATE_TOKEN`, `RENOVATE_GIT_PRIVATE_KEY`, `GITHUBCOM_TOKEN` in `renovate.yml`) aren't repo secrets and aren't in this vault.
 

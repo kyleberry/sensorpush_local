@@ -9,14 +9,21 @@ name: Release
 # Secrets come from 1Password (SENS-11), like homelab's workflows: the only
 # Forgejo secret is OP_SERVICE_ACCOUNT_TOKEN, a service account that can
 # read just the Sensorpush-Local vault. Each job loads what it needs with
-# 1password/load-secrets-action:
-#   RELEASE_BOT_FORGEJO_TOKEN   Release Bot's Forgejo PAT (see below)
-#   RELEASE_BOT_GPG_KEY         Release Bot's signing key (see below)
-#   RELEASE_BOT_OPENROUTER_KEY  OpenRouter key for scripts/release_notes.py
-#                               ($10/month limit)
+# 1password/load-secrets-action. The env var names stay clear of the
+# FORGEJO_, GITHUB_ and GITEA_ prefixes: the runner sets variables there
+# (FORGEJO_TOKEN is the automatic Actions token, mirrored as GITHUB_TOKEN),
+# and Forgejo rejects secret and variable names that use them. The
+# 1Password item titles, in parentheses, have no such limit.
+#   RELEASE_BOT_FORGEJO_TOKEN   Release Bot's Forgejo PAT, see below
+#                               (FORGEJO_RELEASE_TOKEN)
+#   RELEASE_BOT_GPG_KEY         Release Bot's signing key, see below
+#                               (Release Bot GPG Key)
+#   RELEASE_BOT_OPENROUTER_KEY  OpenRouter key for scripts/release_notes.py,
+#                               $10/month limit (Release Bot OpenRouter Key)
 #   GH_RELEASE_TOKEN            GitHub fine-grained PAT, Contents read/write
-#                               on kyleberry/sensorpush_local
-#   CODEBERG_RELEASE_TOKEN      Codeberg token, repository read/write (SENS-7)
+#                               on this repo only (GITHUB_RELEASE_TOKEN)
+#   CODEBERG_RELEASE_TOKEN      Codeberg token, repository read/write on this
+#                               repo only (CODEBERG_RELEASE_TOKEN, SENS-7)
 # GitHub and Codeberg are push mirrors of this repo (repo Settings >
 # Repository > Mirror settings), so tags reach them on push; their tokens
 # are only used to wait for the tag and create the release there.
@@ -160,7 +167,7 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          RELEASE_BOT_FORGEJO_TOKEN: op://Sensorpush-Local/Release Bot Forgejo Token/password
+          RELEASE_BOT_FORGEJO_TOKEN: op://Sensorpush-Local/FORGEJO_RELEASE_TOKEN/password
           RELEASE_BOT_GPG_KEY: op://Sensorpush-Local/Release Bot GPG Key/release-bot-private.key
 
       # finalize-release runs after the release PR merges and pushes the tag
@@ -174,8 +181,8 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           RELEASE_BOT_OPENROUTER_KEY: op://Sensorpush-Local/Release Bot OpenRouter Key/password
-          GH_RELEASE_TOKEN: op://Sensorpush-Local/GitHub Release Token/password
-          CODEBERG_RELEASE_TOKEN: op://Sensorpush-Local/Codeberg Release Token/password
+          GH_RELEASE_TOKEN: op://Sensorpush-Local/GITHUB_RELEASE_TOKEN/password
+          CODEBERG_RELEASE_TOKEN: op://Sensorpush-Local/CODEBERG_RELEASE_TOKEN/password
 
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -232,7 +239,6 @@ jobs:
         id: create_pr
         env:
           VERSION: ${{ inputs.version }}
-          FORGEJO_TOKEN: ${{ env.RELEASE_BOT_FORGEJO_TOKEN }}
           FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
         run: |
           jq -n \
@@ -244,7 +250,7 @@ jobs:
 
           http_status=$(curl -s -o /tmp/pr_response.json -w "%{http_code}" \
             -X POST \
-            -H "Authorization: token $FORGEJO_TOKEN" \
+            -H "Authorization: token $RELEASE_BOT_FORGEJO_TOKEN" \
             -H "Content-Type: application/json" \
             "$FORGEJO_API_URL/pulls" \
             -d @/tmp/pr_payload.json)
@@ -261,7 +267,6 @@ jobs:
 
       - name: Enable auto-merge
         env:
-          FORGEJO_TOKEN: ${{ env.RELEASE_BOT_FORGEJO_TOKEN }}
           FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
           PR_NUMBER: ${{ steps.create_pr.outputs.pr_number }}
         # fast-forward-only lands Release Bot's signed commit on main as-is.
@@ -276,7 +281,7 @@ jobs:
 
           http_status=$(curl -s -o /tmp/automerge_response.json -w "%{http_code}" \
             -X POST \
-            -H "Authorization: token $FORGEJO_TOKEN" \
+            -H "Authorization: token $RELEASE_BOT_FORGEJO_TOKEN" \
             -H "Content-Type: application/json" \
             "$FORGEJO_API_URL/pulls/$PR_NUMBER/merge" \
             -d @/tmp/automerge_payload.json)
@@ -314,8 +319,8 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           RELEASE_BOT_GPG_KEY: op://Sensorpush-Local/Release Bot GPG Key/release-bot-private.key
           RELEASE_BOT_OPENROUTER_KEY: op://Sensorpush-Local/Release Bot OpenRouter Key/password
-          GH_RELEASE_TOKEN: op://Sensorpush-Local/GitHub Release Token/password
-          CODEBERG_RELEASE_TOKEN: op://Sensorpush-Local/Codeberg Release Token/password
+          GH_RELEASE_TOKEN: op://Sensorpush-Local/GITHUB_RELEASE_TOKEN/password
+          CODEBERG_RELEASE_TOKEN: op://Sensorpush-Local/CODEBERG_RELEASE_TOKEN/password
 
       - name: Set up Release Bot tag signing
         run: |
