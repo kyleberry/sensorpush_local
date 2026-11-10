@@ -26,7 +26,7 @@ dependencies = [
     # pattern as aiousbwatcher/pyserial above. Keep these at the versions in
     # HA's usb and esphome manifests for the pinned homeassistant release.
     "serialx==1.15.1",
-    "aioesphomeapi==46.25.0",
+    "aioesphomeapi==46.28.0",
 ]
 
 [project.optional-dependencies]
