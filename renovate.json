@@ -51,6 +51,27 @@
       "matchManagers": ["pep621"],
       "matchDepTypes": ["requires-python"],
       "enabled": false
+    },
+    {
+      "description": "Docker images often have no release timestamp: GHCR never returns one, digest updates have none to age against, and Docker Hub's tag API stops answering anonymous clients past page 10, so big repos like node and python fall back to tags without timestamps. With the default timestamp-required, minimumReleaseAge then holds these updates forever. Releases that do have a timestamp still get the age check. Same rule as homelab's renovate.json.",
+      "matchDatasources": ["docker"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
+      "description": "The CI image (.devcontainer/Dockerfile, SENS-10): Node.js and uv versions and the python base image's digest (Debian security rebuilds), in one automerged PR. Majors stay manual (rule above). Safe to automerge: ci-image.yml builds the new image on the PR and again on main, and publishes :latest only after its smoke test and the test suite pass in it, so a broken image never reaches the jobs.",
+      "matchFileNames": [".devcontainer/Dockerfile"],
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
+      "groupName": "ci image",
+      "automerge": true
+    },
+    {
+      "description": "Python version bumps of the base image stay with Home Assistant: back in the home assistant ecosystem group, merged by hand. Only the python digest goes in the ci image group.",
+      "matchFileNames": [".devcontainer/Dockerfile"],
+      "matchPackageNames": ["python"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "home assistant ecosystem",
+      "automerge": false
     }
   ],
   "assignees": ["kyleberry"]
