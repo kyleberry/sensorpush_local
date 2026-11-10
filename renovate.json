@@ -31,7 +31,7 @@
       "matchPackageNames": [
         "python",
         "homeassistant",
-        "pytest-homeassistant-custom-component",
+        "pytest-homeassistant",
         "bleak-retry-connector",
         "habluetooth",
         "serialx",

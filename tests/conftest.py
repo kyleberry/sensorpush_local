@@ -2,7 +2,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.sensorpush_local import SensorPushCoordinator
 from custom_components.sensorpush_local.const import DOMAIN, SENSORPUSH_DOMAIN
@@ -20,7 +20,7 @@ def expected_lingering_timers() -> bool:
 
     homeassistant's bluetooth component (via habluetooth) schedules a
     recurring `_async_expire_devices_schedule_next` timer when the scanner
-    starts. pytest_homeassistant_custom_component's `enable_bluetooth`
+    starts. pytest_homeassistant's `enable_bluetooth`
     fixture correctly unloads the "bluetooth" domain's own config entry at
     teardown, but that doesn't reach this timer in every homeassistant/
     habluetooth version combination — confirmed as a known upstream

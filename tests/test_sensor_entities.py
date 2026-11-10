@@ -2,7 +2,7 @@
 import pytest
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.sensorpush_local.const import DOMAIN
 from custom_components.sensorpush_local.sensor import (
