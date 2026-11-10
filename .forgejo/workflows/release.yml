@@ -5,13 +5,21 @@ name: Release
 # Requires this repo's Actions "Workflow permissions" to be set to
 # "Read and write" (repo Settings > Actions > General) so the default
 # token can create the Forgejo release in finalize-release.
-# GH_RELEASE_TOKEN is only used for the two GitHub API calls (poll +
-# create release) — it never touches Forgejo. CODEBERG_RELEASE_TOKEN does
-# the same for Codeberg (SENS-7): a Codeberg access token with
-# write:repository scope. Both mirrors are push mirrors of this repo, set in
-# repo Settings > Repository > Mirror settings, so tags reach them on push.
-# RELEASE_BOT_OPENROUTER_KEY is Release Bot's own OpenRouter key ($10/month
-# limit), used only by scripts/release_notes.py.
+#
+# Secrets come from 1Password (SENS-11), like homelab's workflows: the only
+# Forgejo secret is OP_SERVICE_ACCOUNT_TOKEN, a service account that can
+# read just the Sensorpush-Local vault. Each job loads what it needs with
+# 1password/load-secrets-action:
+#   RELEASE_BOT_FORGEJO_TOKEN   Release Bot's Forgejo PAT (see below)
+#   RELEASE_BOT_GPG_KEY         Release Bot's signing key (see below)
+#   RELEASE_BOT_OPENROUTER_KEY  OpenRouter key for scripts/release_notes.py
+#                               ($10/month limit)
+#   GH_RELEASE_TOKEN            GitHub fine-grained PAT, Contents read/write
+#                               on kyleberry/sensorpush_local
+#   CODEBERG_RELEASE_TOKEN      Codeberg token, repository read/write (SENS-7)
+# GitHub and Codeberg are push mirrors of this repo (repo Settings >
+# Repository > Mirror settings), so tags reach them on push; their tokens
+# are only used to wait for the tag and create the release there.
 #
 # Split into two triggers instead of one straight-through job because
 # Forgejo has an open bug (codeberg.org/forgejo/forgejo/issues/11159):
@@ -28,25 +36,22 @@ name: Release
 # trigger below picks up and does the tag + release creation, which
 # only ever needed non-protected refs anyway.
 #
-# prepare-release's branch push and PR creation use FORGEJORELEASE_TOKEN
+# prepare-release's branch push and PR creation use RELEASE_BOT_FORGEJO_TOKEN
 # (a real user's PAT, not the default token) for a second reason beyond
 # the branch-protection bug: Forgejo (like GitHub) never triggers new
 # workflow runs as a side effect of a push or PR made with the default
 # Actions token, specifically to prevent infinite recursion. Using the
 # default token here would mean ci.yml's required status check never
 # runs on the release branch, and auto-merge waits forever on a check
-# that was never triggered. FORGEJORELEASE_TOKEN must be a Forgejo
-# Personal Access Token from a real account (repo write scope) added
-# as a repo secret — not something this workflow can generate itself.
-# Named without the FORGEJO_ prefix because Forgejo reserves that
-# prefix for its own secret names (same restriction GitHub applies to
-# GITHUB_-prefixed secrets).
+# that was never triggered. RELEASE_BOT_FORGEJO_TOKEN must be a Forgejo
+# Personal Access Token from the release-bot account (repository read and
+# write) — not something this workflow can generate itself.
 #
 # The release commit and the vX.Y.Z tag are GPG-signed as Release Bot
-# (the account behind FORGEJORELEASE_TOKEN), so they show as verified
+# (the account behind RELEASE_BOT_FORGEJO_TOKEN), so they show as verified
 # and pass "Require signed commits". RELEASE_BOT_GPG_KEY is that key's
-# armored private key (no passphrase), added as a repo secret by hand;
-# the public half is verified on the release-bot account. Forgejo
+# armored private key (no passphrase), the release-bot-private.key file on
+# the vault's "Release Bot GPG Key" item; the public half is verified on the release-bot account. Forgejo
 # verifies against the committer email, so the git identity below must
 # stay release-bot@berry.house, the key's UID and the account's email.
 
@@ -149,11 +154,34 @@ jobs:
     needs: test
     runs-on: debian-trixie
     steps:
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RELEASE_BOT_FORGEJO_TOKEN: op://Sensorpush-Local/Release Bot Forgejo Token/password
+          RELEASE_BOT_GPG_KEY: op://Sensorpush-Local/Release Bot GPG Key/release-bot-private.key
+
+      # finalize-release runs after the release PR merges and pushes the tag
+      # early on, so a missing secret there leaves a tag with no releases.
+      # Resolving its secrets here (not exported) fails the run before
+      # anything is pushed instead.
+      - name: Check finalize-release's secrets resolve
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
+        with:
+          export-env: false
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RELEASE_BOT_OPENROUTER_KEY: op://Sensorpush-Local/Release Bot OpenRouter Key/password
+          GH_RELEASE_TOKEN: op://Sensorpush-Local/GitHub Release Token/password
+          CODEBERG_RELEASE_TOKEN: op://Sensorpush-Local/Codeberg Release Token/password
+
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          token: ${{ secrets.FORGEJORELEASE_TOKEN }}
+          token: ${{ env.RELEASE_BOT_FORGEJO_TOKEN }}
 
       - name: Bump version in manifest.json, pyproject.toml, README.md
         env:
@@ -179,11 +207,9 @@ jobs:
         run: uv lock
 
       - name: Set up Release Bot commit signing
-        env:
-          RELEASE_BOT_GPG_KEY: ${{ secrets.RELEASE_BOT_GPG_KEY }}
         run: |
           if [ -z "$RELEASE_BOT_GPG_KEY" ]; then
-            echo "::error::RELEASE_BOT_GPG_KEY secret is not set"
+            echo "::error::RELEASE_BOT_GPG_KEY is empty; check the 1Password load step"
             exit 1
           fi
           printf '%s\n' "$RELEASE_BOT_GPG_KEY" | gpg --batch --import
@@ -206,7 +232,7 @@ jobs:
         id: create_pr
         env:
           VERSION: ${{ inputs.version }}
-          FORGEJO_TOKEN: ${{ secrets.FORGEJORELEASE_TOKEN }}
+          FORGEJO_TOKEN: ${{ env.RELEASE_BOT_FORGEJO_TOKEN }}
           FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
         run: |
           jq -n \
@@ -235,7 +261,7 @@ jobs:
 
       - name: Enable auto-merge
         env:
-          FORGEJO_TOKEN: ${{ secrets.FORGEJORELEASE_TOKEN }}
+          FORGEJO_TOKEN: ${{ env.RELEASE_BOT_FORGEJO_TOKEN }}
           FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
           PR_NUMBER: ${{ steps.create_pr.outputs.pr_number }}
         # fast-forward-only lands Release Bot's signed commit on main as-is.
@@ -280,12 +306,21 @@ jobs:
           VERSION=$(grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Release Bot tag signing
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
+        with:
+          export-env: true
         env:
-          RELEASE_BOT_GPG_KEY: ${{ secrets.RELEASE_BOT_GPG_KEY }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RELEASE_BOT_GPG_KEY: op://Sensorpush-Local/Release Bot GPG Key/release-bot-private.key
+          RELEASE_BOT_OPENROUTER_KEY: op://Sensorpush-Local/Release Bot OpenRouter Key/password
+          GH_RELEASE_TOKEN: op://Sensorpush-Local/GitHub Release Token/password
+          CODEBERG_RELEASE_TOKEN: op://Sensorpush-Local/Codeberg Release Token/password
+
+      - name: Set up Release Bot tag signing
         run: |
           if [ -z "$RELEASE_BOT_GPG_KEY" ]; then
-            echo "::error::RELEASE_BOT_GPG_KEY secret is not set"
+            echo "::error::RELEASE_BOT_GPG_KEY is empty; check the 1Password load step"
             exit 1
           fi
           printf '%s\n' "$RELEASE_BOT_GPG_KEY" | gpg --batch --import
@@ -310,7 +345,6 @@ jobs:
       - name: Write release notes
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_BOT_OPENROUTER_KEY: ${{ secrets.RELEASE_BOT_OPENROUTER_KEY }}
         run: |
           if ! python3 scripts/release_notes.py "v$VERSION" --out-dir /tmp/release_notes; then
             echo "::warning::release_notes.py failed; using the plain commit list"
@@ -351,7 +385,7 @@ jobs:
       - name: Wait for push mirror to sync tag to GitHub
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ env.GH_RELEASE_TOKEN }}
         run: |
           for i in $(seq 1 12); do
             status=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -370,7 +404,7 @@ jobs:
       - name: Create GitHub release
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ env.GH_RELEASE_TOKEN }}
         run: |
           jq -n \
             --arg tag "v$VERSION" \
@@ -399,7 +433,7 @@ jobs:
       - name: Wait for push mirror to sync tag to Codeberg
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          CODEBERG_TOKEN: ${{ secrets.CODEBERG_RELEASE_TOKEN }}
+          CODEBERG_TOKEN: ${{ env.CODEBERG_RELEASE_TOKEN }}
         run: |
           for i in $(seq 1 12); do
             status=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -418,7 +452,7 @@ jobs:
       - name: Create Codeberg release
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          CODEBERG_TOKEN: ${{ secrets.CODEBERG_RELEASE_TOKEN }}
+          CODEBERG_TOKEN: ${{ env.CODEBERG_RELEASE_TOKEN }}
         run: |
           jq -n \
             --arg tag "v$VERSION" \

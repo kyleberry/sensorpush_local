@@ -23,10 +23,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Load OpenRouter key from 1Password
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RELEASE_BOT_OPENROUTER_KEY: op://Sensorpush-Local/Release Bot OpenRouter Key/password
+
       - name: Write release notes
         env:
           TAG: ${{ inputs.tag }}
-          RELEASE_BOT_OPENROUTER_KEY: ${{ secrets.RELEASE_BOT_OPENROUTER_KEY }}
         run: |
           if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
             echo "::error::Tag '$TAG' doesn't exist"

@@ -7,7 +7,7 @@ name: CI
 # duplicates. This job is main's required check (`CI / test (pull_request)`):
 # it used to be skipped for same-repo PRs, and Forgejo counts a skipped check
 # as passed, so it never gated anything. Release PRs still trigger it because
-# release.yml opens them with FORGEJORELEASE_TOKEN, not the Actions token.
+# release.yml opens them with RELEASE_BOT_FORGEJO_TOKEN, not the Actions token.
 on:
   pull_request:
     branches: ["main"]
