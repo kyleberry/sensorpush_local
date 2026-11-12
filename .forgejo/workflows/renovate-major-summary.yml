@@ -4,7 +4,7 @@
 #
 # The shared ci-tools renovate-major-summary action reads the PR notes,
 # version-pin diff and package usages, fetches linked upstream changelogs,
-# and posts or updates one advisory summary (HOME-365 / CI-6). The complete
+# and posts or updates one advisory summary. The complete
 # repo prompt stays in .forgejo/renovate-major-summary-prompt.md.
 #
 # The job runs only for same-repo renovate/ branches carrying the `major`
