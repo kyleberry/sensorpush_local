@@ -1,0 +1,75 @@
+---
+# AI summary of upstream breaking changes on Renovate major-update PRs
+# (SENS-14), using the shared action moved from homelab (HOME-365 / CI-6).
+#
+# The shared ci-tools renovate-major-summary action reads the PR notes,
+# version-pin diff and package usages, fetches linked upstream changelogs,
+# and posts or updates one advisory summary (HOME-365 / CI-6). The complete
+# repo prompt stays in .forgejo/renovate-major-summary-prompt.md.
+#
+# The job runs only for same-repo renovate/ branches carrying the `major`
+# label (added by renovate.json's packageRules), so minor and patch PRs never
+# check out or load the key (HOME-351). The script checks the label again
+# against the live PR, since an event's payload can be older than the PR. The
+# summary is advisory: it never fails the PR.
+# It runs from the PR head with the key loaded, so the same trust-boundary
+# note as ai-review.yml applies: secrets go only to branches in this repo —
+# this job additionally gates explicitly on the PR head living in this
+# repo — and the key's monthly limit caps the damage.
+
+name: Renovate major summary
+
+# A newer push to the same PR cancels the run still going for the old one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    # edited: Renovate can update the PR body (release notes arrive late)
+    # without a new commit; the script's marker check keeps that cheap.
+    # labeled: the job's `if` requires the major label, so a PR that opens
+    # before the label lands, or is labelled later, runs on this event.
+    # Forgejo supports it as a pull_request type (the payload's action reads
+    # "label_updated", but `labeled` is the trigger name).
+    types: [opened, synchronize, reopened, edited, labeled]
+
+jobs:
+  summarize:
+    name: Major update summary
+    runs-on: debian-trixie
+    container:
+      image: registry.berry.house/sensorpush-local/ci:latest
+    # Same-repo gate: a fork could also name a branch renovate/…, and this job
+    # loads the OpenRouter key. The label gate skips every non-major Renovate PR.
+    if: >-
+      startsWith(github.head_ref, 'renovate/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && contains(github.event.pull_request.labels.*.name, 'major')
+    timeout-minutes: 15
+
+    steps:
+      # The PR head, not the merge commit, with full history so the script
+      # can find the merge base with main.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Load OpenRouter key from 1Password
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          OPENROUTER_API_KEY: op://Sensorpush-Local/OpenRouter PR Review API Key/password
+
+      - name: Summarize and comment
+        uses: https://gitea.berry.house/kyleberry/ci-tools/renovate-major-summary@351f3d2b754e28c3322289eb47775d172a413cb2 # v1.2.0
+        with:
+          prompt: .forgejo/renovate-major-summary-prompt.md
+          openrouter-api-key: ${{ env.OPENROUTER_API_KEY }}
+          forgejo-token: ${{ github.token }}

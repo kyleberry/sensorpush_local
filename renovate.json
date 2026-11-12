@@ -24,7 +24,8 @@
     },
     {
       "matchUpdateTypes": ["major"],
-      "automerge": false
+      "automerge": false,
+      "addLabels": ["major"]
     },
     {
       "groupName": "home assistant ecosystem",

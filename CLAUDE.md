@@ -145,6 +145,7 @@ Releases are automated via the `.forgejo/workflows/release.yml` workflow, split 
 | --- | --- | --- |
 | `RELEASE_BOT_FORGEJO_TOKEN` | `FORGEJO_RELEASE_TOKEN` / `password` | `prepare-release`: release branch push, PR, auto-merge |
 | `RELEASE_BOT_GPG_KEY` | `Release Bot GPG Key` / file `release-bot-private.key` | signing the release commit and tag |
+| `OPENROUTER_API_KEY` | `OpenRouter PR Review API Key` / `password` | advisory AI PR reviews and Renovate major-update summaries |
 | `RELEASE_BOT_OPENROUTER_KEY` | `Release Bot OpenRouter Key` / `password` | `scripts/release_notes.py` |
 | `GH_RELEASE_TOKEN` | `GITHUB_RELEASE_TOKEN` / `password` | GitHub tag poll and release |
 | `CODEBERG_RELEASE_TOKEN` | `CODEBERG_RELEASE_TOKEN` / `password` | Codeberg tag poll and release |
