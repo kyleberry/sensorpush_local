@@ -61,3 +61,5 @@ The Forgejo Actions workflow (`.forgejo/workflows/ci.yml`) runs on PRs targeting
 The devcontainer's Dockerfile also builds the CI image (`.forgejo/workflows/ci-image.yml`, published to `registry.berry.house/sensorpush-local/ci`), so CI runs with the same Python and system packages as the devcontainer.
 
 Dependency updates are managed by Renovate (`renovate.json`, `.forgejo/workflows/renovate.yml`) rather than Dependabot.
+
+PRs also receive an advisory AI review through the shared `ci-tools/ai-review` action (SENS-6). It posts one comment and updates it on later pushes; rebases with an unchanged PR diff skip the model call. GPT 6.1 Sol reviews by default, with Claude Sonnet used for PRs carrying a GPT co-author trailer. Reviews never gate merging, and model/API failures leave a “review unavailable” note. Renovate, release, WIP and fork PRs are skipped. The repo-specific prompt is `.forgejo/ai-review-prompt.md`; the bundle includes CLAUDE.md and CONTRIBUTING.md. The key comes from the Sensorpush-Local 1Password vault.

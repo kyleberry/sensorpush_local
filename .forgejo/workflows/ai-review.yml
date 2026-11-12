@@ -1,0 +1,55 @@
+# Advisory PR reviews via the shared ci-tools action (SENS-6).
+# PR-head code runs with this repo’s limited OpenRouter key. Only same-repo
+# PRs reach checkout and secret loading; fork PRs are excluded.
+name: AI review
+
+# A newer push to the same PR cancels the review still running for the old one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    # edited: a review starts when the WIP prefix is removed from the title.
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  review:
+    name: AI review
+    runs-on: debian-trixie
+    container:
+      image: registry.berry.house/sensorpush-local/ci:latest
+    if: >-
+      !startsWith(github.head_ref, 'renovate/')
+      && !startsWith(github.head_ref, 'release/')
+      && !startsWith(github.event.pull_request.title, 'WIP')
+      && !startsWith(github.event.pull_request.title, '[WIP]')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 20
+
+    steps:
+      # The PR head, not the merge commit, with full history so the action
+      # can find the merge base with main.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Load OpenRouter key from 1Password
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          OPENROUTER_API_KEY: op://Sensorpush-Local/OpenRouter PR Review API Key/password
+
+      - name: Review and comment
+        uses: https://gitea.berry.house/kyleberry/ci-tools/ai-review@a2ff90988772b23f8511000f02b7d2734afc0f5a # v1.1.0
+        with:
+          prompt: .forgejo/ai-review-prompt.md
+          openrouter-api-key: ${{ env.OPENROUTER_API_KEY }}
+          forgejo-token: ${{ github.token }}
+          extra-docs: CONTRIBUTING.md
