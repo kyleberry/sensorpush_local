@@ -39,11 +39,11 @@ RUN apt-get update && apt-get install -y \
 # `node`. npm/npx are symlinks into node_modules/npm/bin in the source image;
 # COPY would dereference them and break their relative requires, so they're
 # recreated here, as in homelab's act-runner Dockerfile.
-COPY --from=node:24.22.2-bookworm-slim /usr/local/include/node /usr/local/include/node
-COPY --from=node:24.22.2-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=node:24.22.2-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:24.22.3-bookworm-slim /usr/local/include/node /usr/local/include/node
+COPY --from=node:24.22.3-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node:24.22.3-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # uv, from its distroless image as astral-sh/uv's docs recommend.
-COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.8 /uv /uvx /usr/local/bin/
