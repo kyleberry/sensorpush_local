@@ -106,7 +106,10 @@ def git(*args: str) -> str:
 
 def previous_tag(tag: str) -> str | None:
     try:
-        return git("describe", "--tags", "--abbrev=0", f"{tag}^")
+        options = []
+        if not re.search(r"(a|b|rc)[0-9]+$", tag):
+            options = ["--match", "v[0-9]*.[0-9]*.[0-9]*", "--exclude", "*[abcr]*"]
+        return git("describe", "--tags", "--abbrev=0", *options, f"{tag}^")
     except subprocess.CalledProcessError:
         return None
 
@@ -163,6 +166,8 @@ def facts(prev: str | None, tag: str) -> str:
     """Versions worked out here, so the model doesn't have to guess them."""
     new, old = pins(tag), pins(prev) if prev else {}
     lines = [f"Release: {tag}" + (f" (previous: {prev})" if prev else "")]
+    if re.search(r"(a|b|rc)[0-9]+$", tag):
+        lines.append("This is a pre-release for opt-in testing; identify it as such.")
     if "homeassistant" in new:
         lines.append(f"Tested against Home Assistant {new['homeassistant']}")
     min_new = min_ha_version(tag)

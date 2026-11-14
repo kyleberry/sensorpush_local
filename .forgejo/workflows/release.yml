@@ -71,7 +71,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g. 1.0.3, no v prefix)'
+        description: 'Version to release (e.g. 1.0.3 or 1.0.4b1, no v prefix)'
         required: true
         type: string
   pull_request:
@@ -80,16 +80,24 @@ on:
 jobs:
   validate:
     name: Validate version input
+    outputs:
+      prerelease: ${{ steps.check.outputs.prerelease }}
     if: github.event_name == 'workflow_dispatch'
     runs-on: debian-trixie
     steps:
       - name: Check version format
+        id: check
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Version '$VERSION' is not in X.Y.Z format"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$ ]]; then
+            echo "::error::Version '$VERSION' must be X.Y.Z or X.Y.Z(a|b|rc)N"
             exit 1
+          fi
+          if [[ "$VERSION" =~ (a|b|rc)[0-9]+$ ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
   test:
@@ -188,7 +196,7 @@ jobs:
         run: |
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" custom_components/sensorpush_local/manifest.json
           sed -i "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" pyproject.toml
-          sed -i "s/version-[0-9]*\.[0-9]*\.[0-9]*-blue/version-$VERSION-blue/" README.md
+          sed -i "s/version-[0-9][0-9a-z.]*-blue/version-$VERSION-blue/" README.md
 
       # uv.lock embeds the project's own resolved version (a self-referencing
       # [[package]] entry) — it must be refreshed here or `uv sync --locked`
@@ -298,6 +306,11 @@ jobs:
         run: |
           VERSION=$(grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" =~ (a|b|rc)[0-9]+$ ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Load secrets from 1Password
         uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
@@ -342,7 +355,11 @@ jobs:
           if ! python3 scripts/release_notes.py "v$VERSION" --out-dir /tmp/release_notes; then
             echo "::warning::release_notes.py failed; using the plain commit list"
             mkdir -p /tmp/release_notes
-            PREVIOUS_TAG=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || echo "")
+            if [[ "$VERSION" =~ (a|b|rc)[0-9]+$ ]]; then
+              PREVIOUS_TAG=$(git describe --tags --abbrev=0 "v$VERSION^" 2>/dev/null || echo "")
+            else
+              PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' --exclude '*[abcr]*' "v$VERSION^" 2>/dev/null || echo "")
+            fi
             git log --pretty=format:"- %s (%h)" "${PREVIOUS_TAG:+$PREVIOUS_TAG..}v$VERSION" > /tmp/release_notes/forgejo.md
             cp /tmp/release_notes/forgejo.md /tmp/release_notes/github.md
             cp /tmp/release_notes/forgejo.md /tmp/release_notes/codeberg.md
@@ -357,8 +374,9 @@ jobs:
           jq -n \
             --arg tag "v$VERSION" \
             --arg name "v$VERSION" \
+            --argjson prerelease "${{ steps.version.outputs.prerelease }}" \
             --rawfile body /tmp/release_notes/forgejo.md \
-            '{tag_name: $tag, name: $name, body: $body}' > /tmp/forgejo_release_payload.json
+            '{tag_name: $tag, name: $name, body: $body, prerelease: $prerelease}' > /tmp/forgejo_release_payload.json
 
           http_status=$(curl -s -o /tmp/forgejo_release_response.json -w "%{http_code}" \
             -X POST \
@@ -402,8 +420,9 @@ jobs:
           jq -n \
             --arg tag "v$VERSION" \
             --arg name "v$VERSION" \
+            --argjson prerelease "${{ steps.version.outputs.prerelease }}" \
             --rawfile body /tmp/release_notes/github.md \
-            '{tag_name: $tag, name: $name, body: $body}' > /tmp/release_payload.json
+            '{tag_name: $tag, name: $name, body: $body, prerelease: $prerelease} + (if $prerelease then {make_latest: "false"} else {} end)' > /tmp/release_payload.json
 
           http_status=$(curl -s -o /tmp/release_response.json -w "%{http_code}" \
             -X POST \
@@ -450,8 +469,9 @@ jobs:
           jq -n \
             --arg tag "v$VERSION" \
             --arg name "v$VERSION" \
+            --argjson prerelease "${{ steps.version.outputs.prerelease }}" \
             --rawfile body /tmp/release_notes/codeberg.md \
-            '{tag_name: $tag, name: $name, body: $body}' > /tmp/codeberg_release_payload.json
+            '{tag_name: $tag, name: $name, body: $body, prerelease: $prerelease}' > /tmp/codeberg_release_payload.json
 
           http_status=$(curl -s -o /tmp/codeberg_release_response.json -w "%{http_code}" \
             -X POST \

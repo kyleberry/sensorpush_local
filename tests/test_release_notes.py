@@ -80,3 +80,30 @@ def test_pin_regex_strips_extras():
     match = release_notes.PIN.match('    "pytest-homeassistant[bluetooth]==2026.11.1",')
     assert match.group(1) == "pytest-homeassistant[bluetooth]"
     assert match.group(2) == "2026.11.1"
+
+
+@pytest.mark.parametrize("suffix", ["a1", "b2", "rc3", ""])
+def test_previous_tag_skips_betas_for_stable(tmp_path, monkeypatch, suffix):
+    """A stable release includes the beta changes; beta notes are incremental."""
+    import subprocess  # pylint: disable=import-outside-toplevel
+
+    def run(*args):
+        subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True)
+
+    run("init")
+    run("config", "user.name", "Test")
+    run("config", "user.email", "test@example.com")
+    for tag in ["v1.0.8", "v1.0.9b1", f"v1.0.9{suffix}"]:
+        run("-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", tag)
+        run("tag", tag)
+    monkeypatch.setattr(release_notes, "REPO_ROOT", tmp_path)
+    expected = "v1.0.9b1" if suffix else "v1.0.8"
+    assert release_notes.previous_tag(f"v1.0.9{suffix}") == expected
+
+
+def test_prerelease_facts_identify_testing_release(monkeypatch):
+    """The model receives an explicit pre-release instruction."""
+    monkeypatch.setattr(release_notes, "pins", lambda ref: {})
+    monkeypatch.setattr(release_notes, "min_ha_version", lambda ref: None)
+    assert "pre-release for opt-in testing" in release_notes.facts(None, "v1.0.9rc1")
+    assert "pre-release" not in release_notes.facts(None, "v1.0.9")
