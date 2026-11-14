@@ -52,7 +52,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register the manual audit service
     async def handle_manual_audit(call):  # pylint: disable=unused-argument
         _LOGGER.info("Manual SensorPush Local Audit triggered")
-        await coordinator.async_refresh()
+        await entry.async_create_background_task(
+            hass, coordinator.async_refresh(), "sensorpush_local_manual_audit"
+        )
 
     hass.services.async_register(DOMAIN, "run_audit", handle_manual_audit)
 
@@ -73,7 +75,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.info(
             "Scheduled daily SensorPush Local audit firing (hour=%d)", daily_hour
         )
-        hass.async_create_task(
+        entry.async_create_background_task(
+            hass,
             coordinator.async_refresh(),
             "sensorpush_local_daily_audit",
         )
