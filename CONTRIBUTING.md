@@ -56,7 +56,7 @@ Configuration lives in `pyproject.toml` (`[tool.black]`, `[tool.isort]`) and `se
 
 ## CI
 
-The Forgejo Actions workflow (`.forgejo/workflows/ci.yml`) runs on PRs targeting `main`, not on branch pushes, so open a PR to get CI. It runs tests, then all four lint checks in sequence. Its `CI / test (pull_request)` job is the required status check: all steps must pass before a PR can be merged.
+The Forgejo Actions workflow (`.forgejo/workflows/ci.yml`) runs on PRs targeting `main`, not on branch pushes, so open a PR to get CI. It runs tests, then all four lint checks in sequence. Branch protection requires `CI / * (pull_request)`, covering both `CI / test (pull_request)` and `CI / Secret scan (pull_request)`. Both must pass before a PR can be merged.
 
 The devcontainer's Dockerfile also builds the CI image (`.forgejo/workflows/ci-image.yml`, published to `registry.berry.house/sensorpush-local/ci`), so CI runs with the same Python and system packages as the devcontainer.
 
