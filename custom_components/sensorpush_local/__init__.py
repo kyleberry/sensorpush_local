@@ -8,6 +8,7 @@ from bleak_retry_connector import establish_connection
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -52,9 +53,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register the manual audit service
     async def handle_manual_audit(call):  # pylint: disable=unused-argument
         _LOGGER.info("Manual SensorPush Local Audit triggered")
-        await entry.async_create_background_task(
-            hass, coordinator.async_refresh(), "sensorpush_local_manual_audit"
-        )
+        try:
+            await entry.async_create_background_task(
+                hass, coordinator.async_refresh(), "sensorpush_local_manual_audit"
+            )
+        except asyncio.CancelledError as err:
+            task = asyncio.current_task()
+            if task is None or task.cancelling():
+                raise
+            raise HomeAssistantError(
+                "Audit cancelled because the config entry was unloaded"
+            ) from err
 
     hass.services.async_register(DOMAIN, "run_audit", handle_manual_audit)
 

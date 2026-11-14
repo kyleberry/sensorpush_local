@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.exceptions import HomeAssistantError
 from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.sensorpush_local import async_unload_entry
@@ -12,7 +13,7 @@ from custom_components.sensorpush_local.const import DOMAIN
 
 
 @pytest.mark.usefixtures("enable_custom_integrations")
-@pytest.mark.parametrize("trigger", ["initial", "daily", "manual"])
+@pytest.mark.parametrize("trigger", ["initial", "daily", "manual", "manual_caller"])
 async def test_unload_cancels_running_audit(hass, trigger):
     """Unloading cancels each audit source and releases both coordinator locks."""
     entry = MockConfigEntry(domain=DOMAIN, data={})
@@ -72,7 +73,17 @@ async def test_unload_cancels_running_audit(hass, trigger):
             assert coordinator.is_audit_running()
             assert coordinator.is_audit_locked()
 
+            if trigger == "manual_caller":
+                service_task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await service_task
+
             assert await hass.config_entries.async_unload(entry.entry_id)
+            if trigger == "manual":
+                with pytest.raises(
+                    HomeAssistantError, match="config entry was unloaded"
+                ):
+                    await service_task
             assert entry.state is ConfigEntryState.NOT_LOADED
             unsubscribe.assert_called_once_with()
             assert entry.entry_id not in hass.data[DOMAIN]
@@ -93,7 +104,7 @@ async def test_unload_cancels_running_audit(hass, trigger):
 
 @pytest.mark.usefixtures("enable_custom_integrations")
 @pytest.mark.parametrize("unload_ok", [True, False])
-async def test_unload_daily_subscription(hass, unload_ok):
+async def test_unload_cleanup_depends_on_platform_unload(hass, unload_ok):
     """Unsubscribe and remove service/data only after successful platform unload."""
     entry = MockConfigEntry(domain=DOMAIN, data={})
     entry.add_to_hass(hass)

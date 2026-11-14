@@ -47,7 +47,7 @@ This is a Home Assistant custom integration that provides 100% local Bluetooth m
 - On setup, calls `devices.async_remove_duplicate_devices` before forwarding the sensor platform — see **Device ownership** below
 - Performs GATT audits on a fixed daily schedule at a configurable hour (default 3:00am local time), registered via `async_track_time_change` (`update_interval` is `None`). The hour is read from `entry.options.get(CONF_DAILY_AUDIT_HOUR, DEFAULT_DAILY_AUDIT_HOUR)`. The `_handle_daily_audit` callback is decorated with `@callback` — this is required for task scheduling to stay on the event loop; omitting it causes HA's thread-safety checker to raise a `RuntimeError` and silently drop the task. The unsub callback is stored on `coordinator._unsub_daily_audit` and called during unload.
 - Schedules the initial audit as a background task on setup (not blocking — `async_config_entry_first_refresh` is intentionally not used; GATT connections take 10–45s per device and would exceed HA's stage 2 bootstrap timeout). The 3am recurring schedule is separate from this and fires independently each day.
-- Exposes a `sensorpush_local.run_audit` service to trigger manual audits. Initial, daily and manual refresh tasks all use `entry.async_create_background_task`, so Home Assistant cancels and waits for them when the entry unloads. The manual service awaits its task, preserving blocking-call behavior. Unsubscribing the daily timer prevents future callbacks; entry task ownership also stops an audit already in progress (SENS-18).
+- Exposes a `sensorpush_local.run_audit` service to trigger manual audits. Initial, daily and manual refresh tasks all use `entry.async_create_background_task`, so Home Assistant cancels and waits for them when the entry unloads. The manual service awaits its task, preserving blocking-call behavior. Unload cancellation becomes a `HomeAssistantError` for the service caller; cancellation of the caller itself still propagates as `CancelledError`. Unsubscribing the daily timer prevents future callbacks; entry task ownership also stops an audit already in progress (SENS-18).
 
 **`audit_device()`** reads two GATT characteristics (Model and Battery UUIDs in `const.py`) and applies hardware-generation-specific voltage math:
 - **HT1 (legacy)**: `(raw_mv + 2140) / 1000` V — detected by a 4-byte model characteristic response
@@ -107,6 +107,7 @@ Dependencies are managed with [uv](https://docs.astral.sh/uv/), pinned to exact 
 
 | File | What it covers |
 |------|---------------|
+| `tests/test_unload.py` | Config-entry lifecycle: audit cancellation and lock release, manual caller errors/cancellation, successful and failed platform cleanup |
 | `tests/test_init.py` | Coordinator logic: service registration, unload, lock behaviour, background task scheduling, `_async_update_data`, `audit_device` error paths |
 | `tests/test_sensor_entities.py` | `SensorPushVoltageSensor` entity: state, attributes, availability, `async_setup_entry` entity creation |
 | `tests/test_devices.py` | Device ownership against the real registries: entity linked to the core device, duplicate/orphan clean-up on setup, entity removed with its core device |
