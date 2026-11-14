@@ -100,3 +100,15 @@ The action uses this repository's Gitleaks pre-commit release pin when present,
 otherwise its own Renovate-maintained pin. Local staged hooks remain enabled
 where configured. The shared action owns installation, checksum verification,
 caching and scanning.
+
+## Workflow and shell lint
+
+CI's Workflow lint job uses ci-tools/workflow-lint to check every Forgejo
+workflow, including inline shell blocks with ShellCheck. Version pins live in
+`.pre-commit-config.yaml`; Forgejo exceptions stay in `.forgejo/actionlint.yaml`.
+Standalone shell scripts are also checked where present.
+
+For local hooks, install `pre-commit` and the pinned `shellcheck-py` release
+from `.pre-commit-config.yaml` into a repo venv, put its `bin` directory on
+PATH, then run `pre-commit run --all-files`. The actionlint hook explicitly
+requires ShellCheck on PATH so inline checks cannot be silently skipped.
