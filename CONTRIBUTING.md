@@ -60,6 +60,12 @@ The Forgejo Actions workflow (`.forgejo/workflows/ci.yml`) runs on PRs targeting
 
 The devcontainer's Dockerfile also builds the CI image (`.forgejo/workflows/ci-image.yml`, published to `registry.berry.house/sensorpush-local/ci`), so CI runs with the same Python and system packages as the devcontainer.
 
+The CI image workflow uses ci-tools v1.5.0's `image-build`, `image-publish`
+and `image-cleanup` actions (CI-15). This repo keeps its smoke script, full
+in-image test suite, credential loading/login and publish gates. Builds use
+`--pull`; manual runs force a rebuild. PRs use unique local tags and never
+publish. Cleanup runs after failures as well as successful runs.
+
 Dependency updates are managed by Renovate (`renovate.json`, `.forgejo/workflows/renovate.yml`) rather than Dependabot.
 
 The configuration extends `local>kyleberry/ci-tools//renovate/base` from

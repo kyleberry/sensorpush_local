@@ -2,7 +2,7 @@ name: CI image
 
 # Builds the devcontainer/CI image from .devcontainer/Dockerfile, checks it,
 # and publishes it to registry.berry.house/sensorpush-local/ci (SENS-10).
-# Modelled on homelab's act-runner-image job.
+# Uses ci-tools image helpers (CI-15); smoke tests and the full suite stay here.
 #
 # Every check runs in a freshly built image: smoke-test.sh (python 3.14, uv,
 # node, git, gpg, ...) and then the full test suite, with the repo piped in as
@@ -17,7 +17,7 @@ name: CI image
 # current Dockerfile's hash, whatever the commit touched. A failed or cancelled
 # publish is then redone by the next push to main. Pushed tags: the
 # Dockerfile hash (traceable) and :latest (what jobs use; the runner
-# force-pulls it before every job).
+# force-pulls it before every job). Manual runs always rebuild with --pull.
 #
 # Pushing needs the Zot user `sensorpush-local`, which can push only under
 # sensorpush-local/ (homelab HOME-359). Its credentials come from the
@@ -52,74 +52,29 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # Reads need no auth (Zot allows anonymous pulls). A missing tag, or any
-      # request failure, leaves a digest empty and so triggers a build.
-      - name: Check published image
-        if: github.event_name != 'pull_request'
-        id: registry
-        env:
-          HASH_TAG: ${{ hashFiles('.devcontainer/Dockerfile') }}
-        run: |
-          accept='application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json'
-          digest() {
-            curl -fsS --max-time 30 -o /dev/null -D - -H "Accept: $accept" \
-              "https://registry.berry.house/v2/sensorpush-local/ci/manifests/$1" \
-              | tr -d '\r' | awk 'tolower($1) == "docker-content-digest:" { print $2 }'
-          }
-          want=$(digest "$HASH_TAG" || true)
-          have=$(digest latest || true)
-          echo "Dockerfile tag $HASH_TAG: ${want:-missing}"
-          echo "latest: ${have:-missing}"
-          if [ -n "$want" ] && [ "$want" = "$have" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            echo "build=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "build=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Decide whether to build
-        id: decide
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            build=true
-          else
-            build="${{ steps.registry.outputs.build }}"
-          fi
-          echo "build=${build:-false}" >> "$GITHUB_OUTPUT"
-
-      # The runner's Docker daemon is shared, so PRs use a per-run tag that
-      # can't collide with another run. --provenance/--sbom off, as in
-      # homelab: attestation metadata otherwise defeats layer cache reuse.
-      - name: Compute image tags
-        if: steps.decide.outputs.build == 'true'
-        id: tag
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            image="sensorpush-local-ci:${{ github.run_id }}-${{ github.run_attempt }}"
-            echo "image=$image" >> "$GITHUB_OUTPUT"
-            echo "tags=-t $image" >> "$GITHUB_OUTPUT"
-          else
-            image="$CI_IMAGE_REPO:${{ hashFiles('.devcontainer/Dockerfile') }}"
-            echo "image=$image" >> "$GITHUB_OUTPUT"
-            echo "tags=-t $image -t $CI_IMAGE_REPO:latest" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build image
-        if: steps.decide.outputs.build == 'true'
-        run: |
-          # shellcheck disable=SC2086 # tags holds several -t flags on purpose
-          docker build --pull --provenance=false --sbom=false \
-            ${{ steps.tag.outputs.tags }} .devcontainer/
+      # Shared digest checks, unique PR tags and build; validation stays here.
+      # Preserve this caller's base-image pull and manual-run policies.
+      - name: Build image if needed
+        id: image
+        uses: https://gitea.berry.house/kyleberry/ci-tools/image-build@3a3eb0add051c557dbae18db84bc7e84e1c587ea # v1.5.0
+        with:
+          repository: ${{ env.CI_IMAGE_REPO }}
+          content-tag: ${{ hashFiles('.devcontainer/Dockerfile') }}
+          context: .devcontainer/
+          pr-tag-prefix: sensorpush-local-ci
+          pull: 'true'
+          force-build: ${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Smoke-test image
-        if: steps.decide.outputs.build == 'true'
-        run: docker run --rm -i "${{ steps.tag.outputs.image }}" bash -s < .devcontainer/smoke-test.sh
+        if: steps.image.outputs.build == 'true'
+        run: docker run --rm -i "${{ steps.image.outputs.image }}" bash -s < .devcontainer/smoke-test.sh
 
       # The same steps as ci.yml's test job, minus the linters: proves the
       # image can install the locked dependencies and run the suite.
       - name: Run the test suite in the image
-        if: steps.decide.outputs.build == 'true'
+        if: steps.image.outputs.build == 'true'
         run: |
-          git archive --format=tar HEAD | docker run --rm -i "${{ steps.tag.outputs.image }}" bash -c '
+          git archive --format=tar HEAD | docker run --rm -i "${{ steps.image.outputs.image }}" bash -c '
             set -euo pipefail
             mkdir /src && cd /src && tar -x
             uv sync --extra test --locked -q
@@ -127,7 +82,7 @@ jobs:
           '
 
       - name: Load registry credentials
-        if: steps.decide.outputs.build == 'true' && github.event_name != 'pull_request'
+        if: steps.image.outputs.build == 'true' && github.event_name != 'pull_request'
         uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
         with:
           export-env: true
@@ -139,26 +94,21 @@ jobs:
       # The login lands in this job container's ~/.docker/config.json, which
       # goes away with the container; the logout at the end is belt and braces.
       - name: Log in to registry.berry.house
-        if: steps.decide.outputs.build == 'true' && github.event_name != 'pull_request'
+        if: steps.image.outputs.build == 'true' && github.event_name != 'pull_request'
         run: printf '%s' "$ZOT_PASSWORD" | docker login registry.berry.house -u "$ZOT_USER" --password-stdin
 
-      # Retried like homelab's pushes: Zot can stall a push under load (HOME-247).
+      # Publish only after all caller validation and login steps succeed.
       - name: Push image
-        if: steps.decide.outputs.build == 'true' && github.event_name != 'pull_request'
-        run: |
-          for ref in "${{ steps.tag.outputs.image }}" "$CI_IMAGE_REPO:latest"; do
-            for attempt in 1 2 3; do
-              if docker push "$ref"; then break; fi
-              if [ "$attempt" -eq 3 ]; then exit 1; fi
-              echo "::warning::docker push $ref failed (attempt $attempt), retrying in 15s"
-              sleep 15
-            done
-          done
+        if: steps.image.outputs.build == 'true' && github.event_name != 'pull_request'
+        uses: https://gitea.berry.house/kyleberry/ci-tools/image-publish@3a3eb0add051c557dbae18db84bc7e84e1c587ea # v1.5.0
+        with:
+          image: ${{ steps.image.outputs.image }}
+          latest: ${{ steps.image.outputs.latest }}
 
-      - name: Log out of registry.berry.house
-        if: always() && steps.decide.outputs.build == 'true' && github.event_name != 'pull_request'
-        run: docker logout registry.berry.house || true
-
-      - name: Remove PR image tag
-        if: always() && steps.decide.outputs.build == 'true' && github.event_name == 'pull_request'
-        run: docker image rm "${{ steps.tag.outputs.image }}" || true
+      # Always remove the PR tag or log out, including after a failed build/test.
+      - name: Clean up image
+        if: always()
+        uses: https://gitea.berry.house/kyleberry/ci-tools/image-cleanup@3a3eb0add051c557dbae18db84bc7e84e1c587ea # v1.5.0
+        with:
+          image: ${{ steps.image.outputs.image }}
+          registry: registry.berry.house
