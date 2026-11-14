@@ -71,4 +71,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan full history
-        uses: https://gitea.berry.house/kyleberry/ci-tools/gitleaks@3a3eb0add051c557dbae18db84bc7e84e1c587ea # v1.5.0
+        uses: https://gitea.berry.house/kyleberry/ci-tools/gitleaks@8c8ce137b6450f1d38ddb112279fafe25fe3bdcf # v1.6.0
