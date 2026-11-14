@@ -31,10 +31,11 @@ async def test_run_audit_service(hass, mock_coordinator):
             return_value=mock_coordinator,
         ),
         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
-        patch.object(mock_entry, "async_create_background_task"),
     ):
 
         await async_setup_entry(hass, mock_entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+        mock_coordinator.async_refresh.assert_awaited_once()
         mock_coordinator.async_refresh.reset_mock()
 
         # Verify service call triggers refresh
@@ -43,7 +44,6 @@ async def test_run_audit_service(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_concurrent_refresh_preserves_data(hass, mock_coordinator, caplog):
     """Test that a concurrent _async_update_data call returns existing data unchanged."""
     coordinator = mock_coordinator
@@ -133,10 +133,10 @@ async def test_unload_entry(hass, mock_coordinator):
             "homeassistant.config_entries.ConfigEntries.async_unload_platforms",
             return_value=True,
         ),
-        patch.object(mock_entry, "async_create_background_task"),
     ):
 
         await async_setup_entry(hass, mock_entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
         assert DOMAIN in hass.data
         assert hass.services.has_service(DOMAIN, "run_audit")
 
@@ -146,7 +146,6 @@ async def test_unload_entry(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_initial_audit_scheduled_as_background_task(hass, mock_coordinator):
     """Test that setup schedules the initial audit as a background task, not blocking startup."""
     mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={})
@@ -173,7 +172,6 @@ async def test_initial_audit_scheduled_as_background_task(hass, mock_coordinator
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_audit_device_not_found(hass, mock_coordinator, caplog):
     """Test that audit_device returns {} and logs when BLE device is not found."""
     with patch(
@@ -268,7 +266,6 @@ async def test_persisted_data_none_leaves_data_empty(hass, mock_coordinator):
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_setup_loads_persisted_data(hass, mock_coordinator):
     """Test that async_setup_entry calls async_load_persisted_data before the background audit."""
     mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={})
@@ -282,16 +279,15 @@ async def test_setup_loads_persisted_data(hass, mock_coordinator):
             return_value=mock_coordinator,
         ),
         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
-        patch.object(mock_entry, "async_create_background_task"),
     ):
 
         await async_setup_entry(hass, mock_entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
 
     mock_coordinator._store.async_load.assert_called_once()
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_update_data_skips_device_without_bluetooth_identifier(
     hass, mock_coordinator, sp_entry
 ):
@@ -313,7 +309,6 @@ async def test_update_data_skips_device_without_bluetooth_identifier(
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_daily_audit_callback_triggers_refresh(hass, mock_coordinator):
     """Test that the 3am daily callback schedules an async_refresh task."""
     mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={})
@@ -334,13 +329,13 @@ async def test_daily_audit_callback_triggers_refresh(hass, mock_coordinator):
             return_value=mock_coordinator,
         ),
         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
-        patch.object(mock_entry, "async_create_background_task"),
         patch(
             "custom_components.sensorpush_local.async_track_time_change",
             side_effect=fake_track_time_change,
         ),
     ):
         await async_setup_entry(hass, mock_entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
 
     assert captured_callback is not None
     mock_coordinator.async_refresh.reset_mock()
@@ -348,11 +343,10 @@ async def test_daily_audit_callback_triggers_refresh(hass, mock_coordinator):
     captured_callback(None)  # pylint: disable=not-callable  # simulate 3am firing
     await hass.async_block_till_done()
 
-    mock_coordinator.async_refresh.assert_called_once()
+    mock_coordinator.async_refresh.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-@pytest.mark.filterwarnings("ignore:coroutine.*was never awaited:RuntimeWarning")
 async def test_options_update_triggers_reload(hass, mock_coordinator):
     """Test that updating options calls async_reload on the config entry."""
     mock_entry = MockConfigEntry(domain=DOMAIN, entry_id="mock_id", data={}, options={})
@@ -366,17 +360,19 @@ async def test_options_update_triggers_reload(hass, mock_coordinator):
             return_value=mock_coordinator,
         ),
         patch("homeassistant.config_entries.ConfigEntries.async_forward_entry_setups"),
-        patch.object(mock_entry, "async_create_background_task"),
         patch(
             "custom_components.sensorpush_local.async_track_time_change",
             return_value=lambda: None,
         ),
     ):
         await async_setup_entry(hass, mock_entry)
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    mock_coordinator.async_refresh.assert_awaited_once()
 
     with patch.object(hass.config_entries, "async_reload") as mock_reload:
         hass.config_entries.async_update_entry(
             mock_entry, options={"daily_audit_hour": 6}
         )
         await hass.async_block_till_done()
-        mock_reload.assert_called_once_with(mock_entry.entry_id)
+        mock_reload.assert_awaited_once_with(mock_entry.entry_id)
