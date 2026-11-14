@@ -67,7 +67,7 @@ jobs:
           OPENROUTER_API_KEY: op://Sensorpush-Local/OpenRouter PR Review API Key/password
 
       - name: Summarize and comment
-        uses: https://gitea.berry.house/kyleberry/ci-tools/renovate-major-summary@8c8ce137b6450f1d38ddb112279fafe25fe3bdcf # v1.6.0
+        uses: https://gitea.berry.house/kyleberry/ci-tools/renovate-major-summary@563fd115043846af13df4ec98caf2d099218d8a8 # v1.7.0
         with:
           prompt: .forgejo/renovate-major-summary-prompt.md
           ecosystem-label: ha-ecosystem
