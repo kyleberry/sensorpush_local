@@ -1,0 +1,6 @@
+title = "sensorpush_local secret scanning"
+
+[extend]
+useDefault = true
+
+# No repository-specific exceptions were needed by the CI-14 history baseline.

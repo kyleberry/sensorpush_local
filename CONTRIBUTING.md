@@ -76,3 +76,17 @@ review.
 PRs also receive an advisory AI review through the shared `ci-tools/ai-review` action (SENS-6). It posts one comment and updates it on later pushes; rebases with an unchanged PR diff skip the model call. GPT 6.1 Sol reviews by default, with Claude Sonnet used for PRs carrying a GPT co-author trailer. Reviews never gate merging, and model/API failures leave a “review unavailable” note. Renovate, release, WIP and fork PRs are skipped. The repo-specific prompt is `.forgejo/ai-review-prompt.md`; the bundle includes CLAUDE.md and CONTRIBUTING.md. The key comes from the Sensorpush-Local 1Password vault.
 
 Renovate major-update PRs receive a separate advisory summary through `ci-tools/renovate-major-summary` (SENS-14). The `major` repository label was created as part of SENS-14 and must exist for Renovate to apply it. Renovate adds that label; the workflow runs only for same-repo `renovate/` branches with that label. It reads the PR release notes, fetches supported upstream changelogs, and maps breaking changes to visible package usages. One comment is updated in place, and failures do not gate merging. The prompt is `.forgejo/renovate-major-summary-prompt.md`; it uses the same vault key as the ordinary PR reviewer.
+
+## Secret scanning
+
+CI-14 uses the shared ci-tools Gitleaks action to scan the full checked-out
+Git history, including secrets deleted before HEAD. Checkout must use
+`fetch-depth: 0`; findings fail the Secret scan check with redacted output.
+Repository exceptions belong in `.gitleaks.toml` or `.gitleaksignore` and
+must be narrow and documented. The initial full-history baseline found no
+findings requiring new exceptions.
+
+The action uses this repository's Gitleaks pre-commit release pin when present,
+otherwise its own Renovate-maintained pin. Local staged hooks remain enabled
+where configured. The shared action owns installation, checksum verification,
+caching and scanning.

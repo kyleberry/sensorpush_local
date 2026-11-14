@@ -60,3 +60,15 @@ jobs:
       - name: Lint (pylint)
         run: |
           pylint custom_components/ tests/ scripts/ --fail-under=9.5
+
+  secret-scan:
+    name: Secret scan
+    runs-on: debian-trixie
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Scan full history
+        uses: https://gitea.berry.house/kyleberry/ci-tools/gitleaks@d5fc996063208c5f328c8910e4316458455b82bd # v1.4.0
