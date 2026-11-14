@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Lint workflows and shell scripts
-        uses: https://gitea.berry.house/kyleberry/ci-tools/workflow-lint@563fd115043846af13df4ec98caf2d099218d8a8 # CI-16 helper; release pending
+        uses: https://gitea.berry.house/kyleberry/ci-tools/workflow-lint@563fd115043846af13df4ec98caf2d099218d8a8 # v1.7.0
         with:
           shell-files: |
             .devcontainer/post-create.sh

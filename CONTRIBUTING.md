@@ -56,7 +56,7 @@ Configuration lives in `pyproject.toml` (`[tool.black]`, `[tool.isort]`) and `se
 
 ## CI
 
-The Forgejo Actions workflow (`.forgejo/workflows/ci.yml`) runs on PRs targeting `main`, not on branch pushes, so open a PR to get CI. It runs tests, then all four lint checks in sequence. Branch protection requires `CI / * (pull_request)`, covering both `CI / test (pull_request)` and `CI / Secret scan (pull_request)`. Both must pass before a PR can be merged.
+The Forgejo Actions workflow (`.forgejo/workflows/ci.yml`) runs on PRs targeting `main`, not on branch pushes, so open a PR to get CI. It runs tests, then all four lint checks in sequence. Branch protection requires `CI / * (pull_request)`, covering `CI / test (pull_request)`, `CI / Secret scan (pull_request)` and `CI / Workflow lint (pull_request)`. All three must pass before a PR can be merged.
 
 The devcontainer's Dockerfile also builds the CI image (`.forgejo/workflows/ci-image.yml`, published to `registry.berry.house/sensorpush-local/ci`), so CI runs with the same Python and system packages as the devcontainer.
 
@@ -106,7 +106,9 @@ caching and scanning.
 CI's Workflow lint job uses ci-tools/workflow-lint to check every Forgejo
 workflow, including inline shell blocks with ShellCheck. Version pins live in
 `.pre-commit-config.yaml`; Forgejo exceptions stay in `.forgejo/actionlint.yaml`.
-Standalone shell scripts are also checked where present.
+CI checks the standalone scripts listed in the workflow’s `shell-files`
+input. Add new shell scripts to that list; the local ShellCheck hook discovers
+all tracked shell scripts automatically.
 
 For local hooks, install `pre-commit` and the pinned `shellcheck-py` release
 from `.pre-commit-config.yaml` into a repo venv, put its `bin` directory on
