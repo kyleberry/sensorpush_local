@@ -28,14 +28,10 @@ jobs:
     runs-on: debian-trixie
     steps:
       - name: Run Renovate
-        run: renovate
+        uses: https://gitea.berry.house/kyleberry/ci-tools/renovate-runner@63f42648a895423e8256e6456a15616e97e4a850 # v1.3.0
         env:
           RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
-          RENOVATE_PLATFORM: forgejo
-          RENOVATE_ENDPOINT: ${{ github.server_url }}
-          RENOVATE_REPOSITORIES: ${{ github.repository }}
           # Signs Renovate's commits with the renovate-bot account's GPG key.
           RENOVATE_GIT_PRIVATE_KEY: ${{ secrets.RENOVATE_GIT_PRIVATE_KEY }}
           # Needed to look up GitHub Actions releases without hitting API rate limits.
           GITHUB_COM_TOKEN: ${{ secrets.GITHUBCOM_TOKEN }}
-          LOG_LEVEL: info
