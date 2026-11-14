@@ -64,6 +64,17 @@
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "home assistant ecosystem",
       "automerge": false
+    },
+    {
+      "description": "Internal ci-tools releases can open on the next Renovate run (CI-20). Keep this after generic action grouping so our actions get their own immediate group; the shared major-update rule still requires manual review. Match the full depName because the github-actions manager uses kyleberry/ci-tools as packageName.",
+      "matchDepNames": [
+        "https://gitea.berry.house/kyleberry/ci-tools"
+      ],
+      "groupName": "ci-tools",
+      "schedule": [
+        "at any time"
+      ],
+      "minimumReleaseAge": null
     }
   ],
   "assignees": ["kyleberry"]

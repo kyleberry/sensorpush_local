@@ -68,7 +68,10 @@ conflict-only rebasing, squash automerge for minor/patch updates and Sunday
 majors. Renovate runs daily at 12:00 UTC. Minor and patch updates can open
 throughout the week; the Home Assistant ecosystem group still requires manual
 review, and lock file maintenance stays on Monday. Repository-specific
-compatibility and Docker rules remain in `renovate.json`.
+compatibility and Docker rules remain in `renovate.json`. Internal ci-tools
+action updates use a separate group with no release-age or Sunday delay;
+minor/patch updates still need CI before automerge, and majors require manual
+review.
 
 PRs also receive an advisory AI review through the shared `ci-tools/ai-review` action (SENS-6). It posts one comment and updates it on later pushes; rebases with an unchanged PR diff skip the model call. GPT 6.1 Sol reviews by default, with Claude Sonnet used for PRs carrying a GPT co-author trailer. Reviews never gate merging, and model/API failures leave a “review unavailable” note. Renovate, release, WIP and fork PRs are skipped. The repo-specific prompt is `.forgejo/ai-review-prompt.md`; the bundle includes CLAUDE.md and CONTRIBUTING.md. The key comes from the Sensorpush-Local 1Password vault.
 
