@@ -39,9 +39,9 @@ RUN apt-get update && apt-get install -y \
 # `node`. npm/npx are symlinks into node_modules/npm/bin in the source image;
 # COPY would dereference them and break their relative requires, so they're
 # recreated here, as in homelab's act-runner Dockerfile.
-COPY --from=node:24.22.3-bookworm-slim /usr/local/include/node /usr/local/include/node
-COPY --from=node:24.22.3-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=node:24.22.3-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+COPY --from=node:26.13.1-bookworm-slim /usr/local/include/node /usr/local/include/node
+COPY --from=node:26.13.1-bookworm-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node:26.13.1-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
