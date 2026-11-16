@@ -56,7 +56,7 @@ jobs:
       # Preserve this caller's base-image pull and manual-run policies.
       - name: Build image if needed
         id: image
-        uses: https://gitea.berry.house/kyleberry/ci-tools/image-build@228584c0bac91ccac61a64836919aea2ff6c8476 # v1.10.0
+        uses: https://gitea.berry.house/kyleberry/ci-tools/image-build@0c6cd58f57eb86d2141ae9099a2128a32e3a6f1e # v1.10.1
         with:
           repository: ${{ env.CI_IMAGE_REPO }}
           content-tag: ${{ hashFiles('.devcontainer/Dockerfile') }}
@@ -100,7 +100,7 @@ jobs:
       # Publish only after all caller validation and login steps succeed.
       - name: Push image
         if: steps.image.outputs.build == 'true' && github.event_name != 'pull_request'
-        uses: https://gitea.berry.house/kyleberry/ci-tools/image-publish@228584c0bac91ccac61a64836919aea2ff6c8476 # v1.10.0
+        uses: https://gitea.berry.house/kyleberry/ci-tools/image-publish@0c6cd58f57eb86d2141ae9099a2128a32e3a6f1e # v1.10.1
         with:
           image: ${{ steps.image.outputs.image }}
           latest: ${{ steps.image.outputs.latest }}
@@ -108,7 +108,7 @@ jobs:
       # Always remove the PR tag or log out, including after a failed build/test.
       - name: Clean up image
         if: always()
-        uses: https://gitea.berry.house/kyleberry/ci-tools/image-cleanup@228584c0bac91ccac61a64836919aea2ff6c8476 # v1.10.0
+        uses: https://gitea.berry.house/kyleberry/ci-tools/image-cleanup@0c6cd58f57eb86d2141ae9099a2128a32e3a6f1e # v1.10.1
         with:
           image: ${{ steps.image.outputs.image }}
           registry: registry.berry.house

@@ -71,7 +71,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan full history
-        uses: https://gitea.berry.house/kyleberry/ci-tools/gitleaks@228584c0bac91ccac61a64836919aea2ff6c8476 # v1.10.0
+        uses: https://gitea.berry.house/kyleberry/ci-tools/gitleaks@0c6cd58f57eb86d2141ae9099a2128a32e3a6f1e # v1.10.1
 
   workflow-lint:
     name: Workflow lint
@@ -80,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Lint workflows and shell scripts
-        uses: https://gitea.berry.house/kyleberry/ci-tools/workflow-lint@228584c0bac91ccac61a64836919aea2ff6c8476 # v1.10.0
+        uses: https://gitea.berry.house/kyleberry/ci-tools/workflow-lint@0c6cd58f57eb86d2141ae9099a2128a32e3a6f1e # v1.10.1
         with:
           shell-files: |
             .devcontainer/post-create.sh
