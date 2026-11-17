@@ -173,6 +173,6 @@ Pushing uses the Zot user `sensorpush-local`, which can push only under `sensorp
 
 Mount only cross-platform-safe subdirectories — not `~/.claude` wholesale. Plugins are platform-specific binaries; mounting them from macOS into Linux breaks them. Safe to share: `settings.json`, `skills/`, `projects/`.
 
-Because `~/.claude/plugins` isn't mounted, `.devcontainer/post-create.sh` installs the `kyle-dev` and `berry-mcp` plugins (kyleberry/claude-plugins) inside the container. kyle-dev's guard hook blocks commits on main and needs `jq`, which the Dockerfile installs (the same Dockerfile builds the CI image, see above). If gitea.berry.house is unreachable at create time, the script warns and carries on; rerun it later.
+Because `~/.claude/plugins` isn't mounted, `.devcontainer/post-create.sh` installs the `kyle-dev` and `berry-mcp` plugins (kyleberry/claude-plugins) inside the container. kyle-dev's guard hook blocks commits on main and needs `jq`, which the Dockerfile installs (the same Dockerfile builds the CI image, see above). If forge.berry.house is unreachable at create time, the script warns and carries on; rerun it later.
 
 berry-mcp needs `MCP_BEARER_TOKEN`, passed in via `containerEnv` from the environment of whatever starts the container. Open VS Code from a terminal in this repo (`code .`), so direnv has loaded it from `~/git/.envrc`. `runArgs` points the container's DNS at AdGuard (192.168.86.2) so `mcp.berry.house` resolves to Caddy on the LAN, as on the host.

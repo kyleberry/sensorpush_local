@@ -7,4 +7,4 @@ paths:
   .forgejo/workflows/**/*.{yml,yaml}:
     ignore:
       # Forgejo supports full action URLs; GitHub's action syntax does not.
-      - 'specifying action "https://gitea\.berry\.house/kyleberry/ci-tools/.*" in invalid format'
+      - 'specifying action "https://forge\.berry\.house/kyleberry/ci-tools/.*" in invalid format'

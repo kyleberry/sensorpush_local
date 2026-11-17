@@ -38,7 +38,7 @@ OPENROUTER = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "openai/gpt-6.1-sol"
 # Pinned to OpenAI's own hosting, and never to providers that store prompts.
 PROVIDER = {"order": ["openai"], "allow_fallbacks": False, "data_collection": "deny"}
-FORGEJO_REPO_URL = "https://gitea.berry.house/kyleberry/sensorpush_local"
+FORGEJO_REPO_URL = "https://forge.berry.house/kyleberry/sensorpush_local"
 GITHUB_REPO_URL = "https://github.com/kyleberry/sensorpush_local"
 CODEBERG_REPO_URL = "https://codeberg.org/kyleberry/sensorpush_local"
 # Total time for the model call, retries included.
