@@ -47,7 +47,7 @@ jobs:
           OPENROUTER_API_KEY: op://Sensorpush-Local/OpenRouter PR Review API Key/password
 
       - name: Review and comment
-        uses: https://forge.berry.house/kyleberry/ci-tools/ai-review@0c6cd58f57eb86d2141ae9099a2128a32e3a6f1e # v1.10.1
+        uses: https://forge.berry.house/kyleberry/ci-tools/ai-review@664b6e2735d1938f503c1f3f865b15dc66e6c697 # v1.10.3
         with:
           prompt: .forgejo/ai-review-prompt.md
           openrouter-api-key: ${{ env.OPENROUTER_API_KEY }}

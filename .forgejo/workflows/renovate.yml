@@ -28,7 +28,7 @@ jobs:
     runs-on: debian-trixie
     steps:
       - name: Run Renovate
-        uses: https://forge.berry.house/kyleberry/ci-tools/renovate-runner@0c6cd58f57eb86d2141ae9099a2128a32e3a6f1e # v1.10.1
+        uses: https://forge.berry.house/kyleberry/ci-tools/renovate-runner@664b6e2735d1938f503c1f3f865b15dc66e6c697 # v1.10.3
         env:
           RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
           # Signs Renovate's commits with the renovate-bot account's GPG key.
