@@ -2137,22 +2137,22 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aioesphomeapi", specifier = "==46.30.0" },
-    { name = "aiousbwatcher", specifier = "==1.1.2" },
+    { name = "aioesphomeapi" },
+    { name = "aiousbwatcher" },
     { name = "argcomplete", marker = "extra == 'test'", specifier = "==3.7.2" },
     { name = "black", marker = "extra == 'test'", specifier = "==26.10.1" },
-    { name = "bleak-retry-connector", specifier = "==4.7.1" },
+    { name = "bleak-retry-connector" },
     { name = "flake8", marker = "extra == 'test'", specifier = "==7.5.0" },
     { name = "flake8-pyproject", marker = "extra == 'test'", specifier = "==1.2.4" },
-    { name = "habluetooth", specifier = "==7.1.2" },
+    { name = "habluetooth" },
     { name = "homeassistant", specifier = "==2026.11.1" },
     { name = "isort", marker = "extra == 'test'", specifier = "==9.0.2" },
     { name = "pylint", marker = "extra == 'test'", specifier = "==4.1.4" },
-    { name = "pyserial", specifier = "==3.5" },
+    { name = "pyserial" },
     { name = "pytest-asyncio", marker = "extra == 'test'" },
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pytest-homeassistant", extras = ["bluetooth"], marker = "extra == 'test'", specifier = "==2026.11.1" },
-    { name = "serialx", specifier = "==1.15.1" },
+    { name = "serialx" },
 ]
 provides-extras = ["test"]
 

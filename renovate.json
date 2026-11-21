@@ -23,11 +23,7 @@
       "matchPackageNames": [
         "python",
         "homeassistant",
-        "pytest-homeassistant",
-        "bleak-retry-connector",
-        "habluetooth",
-        "serialx",
-        "aioesphomeapi"
+        "pytest-homeassistant"
       ],
       "automerge": false,
       "rangeStrategy": "bump",
@@ -37,11 +33,7 @@
       "description": "SENS-16: research the manually merged HA ecosystem on every update type. Keep this list aligned with the ecosystem group above, excluding python, whose digest updates belong to ci image.",
       "matchPackageNames": [
         "homeassistant",
-        "pytest-homeassistant",
-        "bleak-retry-connector",
-        "habluetooth",
-        "serialx",
-        "aioesphomeapi"
+        "pytest-homeassistant"
       ],
       "addLabels": ["ha-ecosystem"]
     },

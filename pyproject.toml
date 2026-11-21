@@ -6,27 +6,20 @@ readme = "README.md"
 requires-python = ">=3.14.6,<3.15"
 dependencies = [
     "homeassistant==2026.11.1",
-    "bleak-retry-connector==4.7.1",
-    # habluetooth is transitive (pulled in by bleak-retry-connector and
-    # homeassistant) but pinned explicitly so it's a named package Renovate's
-    # "home assistant ecosystem" group can --upgrade-package too. Without
-    # this, `uv lock --upgrade-package homeassistant ...` leaves habluetooth
-    # frozen at whatever's already locked, since neither declared dependency
-    # forces a version new enough — it just satisfies their loose metadata
-    # constraint without being runtime-compatible.
-    "habluetooth==7.1.2",
-    # aiousbwatcher and pyserial are not used directly by this integration
-    # but are hard-imported by homeassistant.components.usb (pulled in via
-    # the bluetooth stack). HA's wheel does not declare them in install_requires
-    # so pip will not install them transitively. Do not remove these.
-    "aiousbwatcher==1.1.2",
-    "pyserial==3.5",
-    # serialx and aioesphomeapi: hard-imported by homeassistant.components.usb
-    # (serialx imports aioesphomeapi) — same undeclared-transitive-dependency
-    # pattern as aiousbwatcher/pyserial above. Keep these at the versions in
-    # HA's usb and esphome manifests for the pinned homeassistant release.
-    "serialx==1.15.1",
-    "aioesphomeapi==46.30.0",
+    # Unpinned on purpose (SENS-19): homeassistant and pytest-homeassistant pin
+    # most of these exactly, so those two releases decide the versions and
+    # uv.lock records them. An exact pin here conflicts whenever a package
+    # releases ahead of Home Assistant.
+    "bleak-retry-connector",
+    "habluetooth",
+    # aiousbwatcher, pyserial, serialx and aioesphomeapi are not used directly
+    # by this integration but are hard-imported by homeassistant.components.usb
+    # (pulled in via the bluetooth stack; serialx imports aioesphomeapi). HA's
+    # wheel does not declare them in install_requires. Do not remove these.
+    "aiousbwatcher",
+    "pyserial",
+    "serialx",
+    "aioesphomeapi",
 ]
 
 [project.optional-dependencies]
