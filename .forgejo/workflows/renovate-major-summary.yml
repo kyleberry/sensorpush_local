@@ -59,7 +59,7 @@ jobs:
           fetch-depth: 0
 
       - name: Summarize and comment
-        uses: https://forge.berry.house/kyleberry/ci-tools/renovate-major-summary@664b6e2735d1938f503c1f3f865b15dc66e6c697 # v1.10.3
+        uses: https://forge.berry.house/kyleberry/ci-tools/renovate-major-summary@16da287ae0d1afae2d7e5ff09d30dbdf6a460035 # v1.10.4
         with:
           prompt: .forgejo/renovate-major-summary-prompt.md
           ecosystem-label: ha-ecosystem
