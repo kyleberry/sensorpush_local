@@ -14,7 +14,7 @@
 #     digest bumps the "ci image" group (renovate.json).
 #   - Node.js and uv: copied from their official images, like homelab's
 #     act-runner image, so Renovate's dockerfile manager tracks them.
-FROM python:3.14.10-bookworm@sha256:3fe825da0a80fa8e2cd79baadeb76b03c0ddf3d6cdbc8346778a0208b9d6038c
+FROM python:3.14.10-bookworm@sha256:004c5c7402ec0f084d6edf336f05c9668dc81ec689a0e5323b9894355762665d
 
 # Build tools and system dependencies for the integration's test suite, plus
 # what CI jobs need: gnupg to sign release commits and tags. libatomic1: the
