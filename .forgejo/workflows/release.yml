@@ -6,10 +6,12 @@ name: Release
 # "Read and write" (repo Settings > Actions > General) so the default
 # token can create the Forgejo release in finalize-release.
 #
-# Secrets come from 1Password (SENS-11), like homelab's workflows: the only
-# Forgejo secret is OP_SERVICE_ACCOUNT_TOKEN, a service account that can
-# read just the Sensorpush-Local vault. Each job loads what it needs with
-# 1password/load-secrets-action. The env var names stay clear of the
+# Secrets come from 1Password (SENS-11), like homelab's workflows, through
+# OP_SERVICE_ACCOUNT_TOKEN, a service account that can read just the
+# Sensorpush-Local vault. Each job loads what it needs with
+# 1password/load-secrets-action. The exception is the OpenRouter key: it's
+# the RELEASE_BOT_OPENROUTER_KEY Forgejo secret, which homelab's
+# terraform/openrouter.tf creates and writes (HOME-433). The env var names stay clear of the
 # FORGEJO_, GITHUB_ and GITEA_ prefixes: the runner sets variables there
 # (FORGEJO_TOKEN is the automatic Actions token, mirrored as GITHUB_TOKEN),
 # and Forgejo rejects secret and variable names that use them. The
@@ -19,7 +21,7 @@ name: Release
 #   RELEASE_BOT_GPG_KEY         Release Bot's signing key, see below
 #                               (Release Bot GPG Key)
 #   RELEASE_BOT_OPENROUTER_KEY  OpenRouter key for scripts/release_notes.py,
-#                               $10/month limit (Release Bot OpenRouter Key)
+#                               $10/month limit (Forgejo secret, see above)
 #   GH_RELEASE_TOKEN            GitHub fine-grained PAT, Contents read/write
 #                               on this repo only (GITHUB_RELEASE_TOKEN)
 #   CODEBERG_RELEASE_TOKEN      Codeberg token, repository read/write on this
@@ -180,7 +182,6 @@ jobs:
           export-env: false
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          RELEASE_BOT_OPENROUTER_KEY: op://Sensorpush-Local/Release Bot OpenRouter Key/password
           GH_RELEASE_TOKEN: op://Sensorpush-Local/GITHUB_RELEASE_TOKEN/password
           CODEBERG_RELEASE_TOKEN: op://Sensorpush-Local/CODEBERG_RELEASE_TOKEN/password
 
@@ -319,7 +320,6 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           RELEASE_BOT_GPG_KEY: op://Sensorpush-Local/Release Bot GPG Key/release-bot-private.key
-          RELEASE_BOT_OPENROUTER_KEY: op://Sensorpush-Local/Release Bot OpenRouter Key/password
           GH_RELEASE_TOKEN: op://Sensorpush-Local/GITHUB_RELEASE_TOKEN/password
           CODEBERG_RELEASE_TOKEN: op://Sensorpush-Local/CODEBERG_RELEASE_TOKEN/password
 
@@ -351,6 +351,7 @@ jobs:
       - name: Write release notes
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BOT_OPENROUTER_KEY: ${{ secrets.RELEASE_BOT_OPENROUTER_KEY }}
         run: |
           if ! python3 scripts/release_notes.py "v$VERSION" --out-dir /tmp/release_notes; then
             echo "::warning::release_notes.py failed; using the plain commit list"

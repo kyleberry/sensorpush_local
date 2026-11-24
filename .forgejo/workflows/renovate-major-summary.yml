@@ -58,19 +58,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Load OpenRouter key from 1Password
-        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5.0.1
-        with:
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          OPENROUTER_API_KEY: op://Sensorpush-Local/OpenRouter PR Review API Key/password
-
       - name: Summarize and comment
         uses: https://forge.berry.house/kyleberry/ci-tools/renovate-major-summary@664b6e2735d1938f503c1f3f865b15dc66e6c697 # v1.10.3
         with:
           prompt: .forgejo/renovate-major-summary-prompt.md
           ecosystem-label: ha-ecosystem
           ecosystem-prompt: .forgejo/renovate-ha-research-prompt.md
-          openrouter-api-key: ${{ env.OPENROUTER_API_KEY }}
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
           forgejo-token: ${{ github.token }}
