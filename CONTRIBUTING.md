@@ -6,6 +6,8 @@ Thanks for taking a look. This is a small integration with a big test suite: mos
 
 Development happens on a self-hosted Forgejo instance. [GitHub](https://github.com/kyleberry/sensorpush_local) and [Codeberg](https://codeberg.org/kyleberry/sensorpush_local) are push mirrors of it, and releases are published on all three. Bug reports and feature requests go to [GitHub issues](https://github.com/kyleberry/sensorpush_local/issues).
 
+Pull requests are welcome on GitHub or Codeberg. Development happens on the Forgejo instance, so I'll bring your PR over there to run CI and merge it, and your commits keep your name. Expect a short delay between opening it and seeing it merged.
+
 `CLAUDE.md` is the detailed maintainer reference: architecture, release process, secrets and the reasons behind the dependency rules. This file covers what you need day to day.
 
 ## Dev environment
