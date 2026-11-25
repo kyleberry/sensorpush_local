@@ -33,7 +33,7 @@ test = [
     # here breaks `uv lock` whenever one releases ahead of the other.
     "pytest-asyncio",
     "pytest-cov",
-    "argcomplete==3.7.2",
+    "argcomplete==3.8.0",
     "black==26.10.1",
     "flake8==7.5.0",
     "flake8-pyproject==1.2.4",
