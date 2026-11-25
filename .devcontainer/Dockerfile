@@ -14,7 +14,7 @@
 #     digest bumps the "ci image" group (renovate.json).
 #   - Node.js and uv: copied from their official images, like homelab's
 #     act-runner image, so Renovate's dockerfile manager tracks them.
-FROM python:3.14.10-bookworm@sha256:004c5c7402ec0f084d6edf336f05c9668dc81ec689a0e5323b9894355762665d
+FROM python:3.14.10-bookworm@sha256:fbaf91204f2758a70a7f7d6cf3c2871851227152a54e6a7b5b59941c4566b6b5
 
 # Build tools and system dependencies for the integration's test suite, plus
 # what CI jobs need: gnupg to sign release commits and tags. libatomic1: the
@@ -46,4 +46,4 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # uv, from its distroless image as astral-sh/uv's docs recommend.
-COPY --from=ghcr.io/astral-sh/uv:0.13.9 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.10 /uv /uvx /usr/local/bin/
