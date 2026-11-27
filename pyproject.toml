@@ -5,7 +5,7 @@ description = "Local Bluetooth monitoring for SensorPush devices"
 readme = "README.md"
 requires-python = ">=3.14.6,<3.15"
 dependencies = [
-    "homeassistant==2026.11.2",
+    "homeassistant==2026.11.3",
     # Unpinned on purpose (SENS-19): homeassistant and pytest-homeassistant pin
     # most of these exactly, so those two releases decide the versions and
     # uv.lock records them. An exact pin here conflicts whenever a package
@@ -27,7 +27,7 @@ test = [
     # Home Assistant's own test harness. Its version always equals the
     # homeassistant release it was built from, so bump them together. The
     # bluetooth extra brings in what the enable_bluetooth fixture needs.
-    "pytest-homeassistant[bluetooth]==2026.11.2",
+    "pytest-homeassistant[bluetooth]==2026.11.3",
     # Unpinned on purpose: pytest-homeassistant pins pytest-asyncio exactly,
     # so its release decides the version (uv.lock records it). An exact pin
     # here breaks `uv lock` whenever one releases ahead of the other.
